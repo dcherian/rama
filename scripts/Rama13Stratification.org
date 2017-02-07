@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import datetime as dt
 import hdf5storage as hs
 import seaborn as sns
+from scipy.io import loadmat
 
 mpl.rcParams['savefig.transparent'] = True
 mpl.rcParams['figure.figsize'] = [6.5, 6.5]
@@ -97,8 +98,6 @@ The mooring sees higher temperature gradients on average but still some negative
 
 #+BEGIN_SRC ipython :session :file /Users/dcherian/rama/scripts/images/Tz-mooring-historical-RAMA13.png :exports both
 
-from scipy.io import loadmat
-
 mat = loadmat('../processed/rama12n90e.mat', squeeze_me=True, struct_as_record=False)
 
 T1 = mat['T1']
@@ -145,17 +144,23 @@ Looks pretty good, I say!
 ** All times
 #+BEGIN_SRC ipython :session :file /Users/dcherian/rama/scripts/images/dTdz-dSdz-RAMA13.png :exports both
 
+def JointPlot(Tz, Sz, titlestr=None, **kwargs):
+    g = sns.jointplot(Tz, Sz,  marker='.', **kwargs)
+    g.set_axis_labels('dT/dz', 'dS/dz')
+    ax = g.fig.get_axes()
+
+    ax[0].axhline(0, color='gray')
+    ax[0].axvline(0, color='gray')
+
+    if titlestr:
+        ax[1].set_title(titlestr)
+
 SzHist = (T1.S-T2.S)/np.abs(T1.z-T2.z)
 
 # first interpolate 10 minute dT/dz to hourly time stamp like dS/dz
 TzHistInterp = np.interp(T1.Stime, T1.time, TzHist)
 
-g = sns.jointplot(TzHistInterp, SzHist,  marker='.')
-g.set_axis_labels('dT/dz', 'dS/dz')
-ax = g.fig.get_axes()
-
-ax[0].axhline(0, color='gray')
-ax[0].axvline(0, color='gray')
+JointPlot(TzHistInterp, SzHist, titlestr='All data')
 
 #+END_SRC
 
@@ -165,3 +170,91 @@ ax[0].axvline(0, color='gray')
 2. S_z has larger magnitude when T_z < 0 which also makes sense.
 
 ** Divide into 4 seasons
+
+#+BEGIN_SRC ipython :session :file /Users/dcherian/rama/scripts/images/dTdz-dSdz-seasons.png :exports both
+def suplabel(axis,label,label_prop=None,
+             labelpad=5,
+             ha='center',va='center'):
+    ''' Add super ylabel or xlabel to the figure
+    Similar to matplotlib.suptitle
+    axis       - string: "x" or "y"
+    label      - string
+    label_prop - keyword dictionary for Text
+    labelpad   - padding from the axis (default: 5)
+    ha         - horizontal alignment (default: "center")
+    va         - vertical alignment (default: "center")
+    '''
+    import matplotlib.pyplot as plt
+    fig = plt.gcf()
+    xmin = []
+    ymin = []
+    for ax in fig.axes:
+        xmin.append(ax.get_position().xmin)
+        ymin.append(ax.get_position().ymin)
+    xmin,ymin = min(xmin),min(ymin)
+    dpi = fig.dpi
+    if axis.lower() == "y":
+        rotation=90.
+        x = xmin-float(labelpad)/dpi
+        y = 0.5
+    elif axis.lower() == 'x':
+        rotation = 0.
+        x = 0.5
+        y = ymin - float(labelpad)/dpi
+    else:
+        raise Exception("Unexpected axis: x or y")
+    if label_prop is None:
+        label_prop = dict()
+    plt.text(x,y,label,rotation=rotation,
+               transform=fig.transFigure,
+               ha=ha,va=va, **label_prop)
+
+def datenum2datetime(matlab_datenum):
+    from matplotlib.dates import num2date
+
+    python_datetime = num2date(matlab_datenum-367)
+
+    return python_datetime
+
+
+def ReturnSeason(time, var, season):
+    ''' Given a season, return data only for the months in that season
+        season can be one of SW, NE, SW->NE or NE->SW
+    '''
+    dates = datenum2datetime(time)
+    months = [d.month for d in dates]
+
+    seasonMonths = { 'SW' :  [5,6,7,8,9],
+                     'SW→NE' : [10, 11],
+                     'NE' :  [12,1,2],
+                     'NE→SW' : [3,4], }
+
+    mask = np.asarray([m in seasonMonths[season] for m in months])
+
+    return time[mask], var[mask]
+
+f, hax = plt.subplots(2,2, sharex=True, sharey=True)
+hax = hax.ravel()
+
+for idx,season in enumerate(['SW', 'SW→NE', 'NE', 'NE→SW']):
+    time,Tz = ReturnSeason(T1.Stime, TzHistInterp, season)
+    time,Sz = ReturnSeason(T1.Stime, SzHist, season)
+
+    sns.regplot(Tz, Sz, ax=hax[idx], ci=None, marker='.');
+    hax[idx].axhline(0, color='gray')
+    hax[idx].axvline(0, color='gray')
+    hax[idx].set_title(season)
+    hax[idx].set_xlim([-0.1, 0.25])
+    hax[idx].set_ylim([-0.15, 0.05])
+
+label_prop=dict(fontsize=14)
+suplabel('y', 'dS/dz', labelpad=15, label_prop=label_prop)
+suplabel('x', 'dT/dz', labelpad=8, label_prop=label_prop)
+f.suptitle('RAMA 12N 90E, 15m - all data (hourly)')
+#+END_SRC
+
+#+RESULTS:
+[[file:/Users/dcherian/rama/scripts/images/dTdz-dSdz-seasons.png]]
+
+During the SW & NE monsoons, There is a tight cluster of points, relatively speaking.
+NE -> SW monsoon seems worst.
