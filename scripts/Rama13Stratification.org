@@ -141,6 +141,161 @@ plt.xlabel('dT/dz from mooring CTDs at 10m, 20m')
 Looks pretty good, I say!
 
 * dT/dz and dS/dz from historical data
+** Filtering
+As Emily pointed out, I should probably get rid of the daily cycle.
+I think we should go further and look at high-frequency variability only. The rest is not really relevant for χ really.
+
+#+BEGIN_SRC ipython :session :file /Users/dcherian/rama/scripts/images/high-pass-filter-dTdz-dSdz.png :exports both
+
+def FindGaps(input):
+    '''
+    Finds and return valid index ranges for the input time series.
+    Input:
+          input - input time series
+    Output:
+          start - starting indices of valid ranges
+          stop  - ending indices of valid ranges
+    '''
+
+    import numpy as np
+
+    NotNans = np.double(~np.isnan(input))
+    edges = np.diff(NotNans)
+    start = np.where(edges == 1)[0]
+    stop = np.where(edges == -1)[0]
+
+    if start.size == 0 and stop.size == 0:
+        start = np.array([0])
+        stop = np.array([len(input)-1])
+
+    else:
+        start = start + 1
+        if ~np.isnan(input[0]):
+            start = np.insert(start, 0, 0)
+
+        if ~np.isnan(input[-1]):
+            stop = np.append(stop, len(input)-1)
+
+    return start, stop
+
+def smooth(x,window_len=11,window='hanning'):
+    """smooth the data using a window with requested size.
+
+    This method is based on the convolution of a scaled window with the signal.
+    The signal is prepared by introducing reflected copies of the signal
+    (with the window size) in both ends so that transient parts are minimized
+    in the begining and end part of the output signal.
+
+    input:
+        x: the input signal
+        window_len: the dimension of the smoothing window; should be an odd integer
+        window: the type of window from 'flat', 'hanning', 'hamming', 'bartlett', 'blackman'
+            flat window will produce a moving average smoothing.
+
+    output:
+        the smoothed signal
+
+    example:
+
+    t=linspace(-2,2,0.1)
+    x=sin(t)+randn(len(t))*0.1
+    y=smooth(x)
+
+    see also:
+
+    numpy.hanning, numpy.hamming, numpy.bartlett, numpy.blackman, numpy.convolve
+    scipy.signal.lfilter
+
+    TODO: the window parameter could be the window itself if an array instead of a string
+    NOTE: length(output) != length(input), to correct this: return y[(window_len/2-1):-(window_len/2)] instead of just y.
+    """
+
+    if x.ndim != 1:
+        raise ValueError("smooth only accepts 1 dimension arrays.")
+
+    if x.size < window_len:
+        raise ValueError("Input vector needs to be bigger than window size.")
+
+
+    if window_len<3:
+        return x
+
+
+    if not window in ['flat', 'hanning', 'hamming', 'bartlett', 'blackman']:
+        raise ValueError("Window is on of 'flat', 'hanning', 'hamming', 'bartlett', 'blackman'")
+
+    s=np.r_[x[window_len-1:0:-1],x,x[-1:-window_len:-1]]
+    #print(len(s))
+    if window == 'flat': #moving average
+        w=np.ones(window_len,'d')
+    else:
+        w=eval('np.'+window+'(window_len)')
+
+    y=np.convolve(w/w.sum(), s, mode='valid')
+    return y
+
+def SpectralDensity(input, nsmooth=5):
+
+    start, stop = FindLargestSegment(input)
+    f, out = signal.periodogram(input[start:stop],
+                                fs=1.0, window='hamming')
+    out = smooth(out, window_len=nsmooth, window='flat')
+    f = smooth(f, window_len=nsmooth, window='flat')
+
+    return f, out
+
+def FindLargestSegment(input):
+
+    start, stop = FindGaps(input)
+    GapLength = stop-start+1
+    imax = np.argmax(GapLength)
+
+    return start[imax], stop[imax]
+
+def HighPassButter(input, freq):
+    import scipy.signal as signal
+
+    b, a = signal.butter(1, freq/(1/2), btype='high')
+    start, stop = FindLargestSegment(input)
+
+    return signal.lfilter(b, a, input[start:stop])
+
+def HighPassAndPlot(input, CutoffFreq, titlestr=None):
+
+    filtered = HighPassButter(input, CutoffFreq)
+
+    f, InputSpec = SpectralDensity(input, 10)
+    plt.loglog(f, InputSpec, label='input data')
+
+    f, FiltSpec = SpectralDensity(filtered, 10)
+    plt.loglog(f, FiltSpec, label='high pass')
+
+    plt.axvline(CutoffFreq, color='gray', zorder=-20)
+    plt.ylabel('Spectral density')
+    plt.xlabel('Frequency')
+    plt.title(titlestr)
+    plt.legend()
+
+SzHistHr = (T1.S-T2.S)/np.abs(T1.z-T2.z)
+# interpolate 10 minute dT/dz to hourly time stamp like dS/dz
+TzHistHr = np.interp(T1.Stime, T1.time, TzHist)
+
+f, [ax1,ax2] = plt.subplots(2,1, sharex='all')
+plt.axes(ax1)
+HighPassAndPlot(TzHistHr, 1/6, titlestr='dT/dz')
+plt.axvline(1/24, color='gray', zorder=-10) # cutoff frequency
+plt.xlabel('')
+
+plt.axes(ax2)
+HighPassAndPlot(SzHistHr, 1/6, titlestr='dS/dz')
+plt.axvline(1/24, color='gray', zorder=-10) # cutoff frequency
+#+END_SRC
+
+#+RESULTS:
+[[file:/Users/dcherian/rama/scripts/images/high-pass-filter-dTdz-dSdz.png]]
+
+Temperature has *strong* daily peak. Needs really strict filtering.
+Salinity not so much.
 ** All times
 #+BEGIN_SRC ipython :session :file /Users/dcherian/rama/scripts/images/dTdz-dSdz-RAMA13.png :exports both
 
@@ -155,12 +310,7 @@ def JointPlot(Tz, Sz, titlestr=None, **kwargs):
     if titlestr:
         ax[1].set_title(titlestr)
 
-SzHist = (T1.S-T2.S)/np.abs(T1.z-T2.z)
-
-# first interpolate 10 minute dT/dz to hourly time stamp like dS/dz
-TzHistInterp = np.interp(T1.Stime, T1.time, TzHist)
-
-JointPlot(TzHistInterp, SzHist, titlestr='All data')
+JointPlot(TzHistHr, SzHistHr, titlestr='All data')
 
 #+END_SRC
 
@@ -237,8 +387,8 @@ f, hax = plt.subplots(2,2, sharex=True, sharey=True)
 hax = hax.ravel()
 
 for idx,season in enumerate(['SW', 'SW→NE', 'NE', 'NE→SW']):
-    time,Tz = ReturnSeason(T1.Stime, TzHistInterp, season)
-    time,Sz = ReturnSeason(T1.Stime, SzHist, season)
+    time,Tz = ReturnSeason(T1.Stime, TzHistHr, season)
+    time,Sz = ReturnSeason(T1.Stime, SzHistHr, season)
 
     sns.regplot(Tz, Sz, ax=hax[idx], ci=None, marker='.');
     hax[idx].axhline(0, color='gray')
