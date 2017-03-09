@@ -35,6 +35,9 @@ sTS = Tz_m['s_TS'][0][0][0]
 
 Tzi[abs(Tzi)>5] = np.nan
 Tzm[abs(Tzm)>5] = np.nan
+#+END_SRC
+
+#+RESULTS:
 
 #+BEGIN_SRC ipython :session :exports both
 def find_approx(vec, value):
@@ -92,7 +95,7 @@ ax2.set_ylabel('pdf')
 
 Seems like the χpod senses more temperature inversions; seems good.
 
-The mooring sees higher temperature gradients on average but still some negative values. I'm surprised this happens with 10-min data. Salinity stratification is the obvious explanation.
+The mooring sees higher temperature gradients on average but still some negative values. I'm surprised this happens with 10-min data. Salinity stratification is the obvious explanation, maybe it's not so unreasonable in the Bay.
 
 * T-S relation from mooring - historical data
 
@@ -137,17 +140,16 @@ plt.xlabel('dT/dz from mooring CTDs at 10m, 20m')
 #+RESULTS:
 [[file:/Users/dcherian/rama/scripts/images/Tz-mooring-historical-RAMA13.png]]
 
-
 Looks pretty good, I say!
 
 * dT/dz and dS/dz from historical data
-** Filtering
+** High pass filtering gradient time series
 As Emily pointed out, I should probably get rid of the daily cycle.
 I think we should go further and look at high-frequency variability only. The rest is not really relevant for χ really.
 
 #+BEGIN_SRC ipython :session :file /Users/dcherian/rama/scripts/images/high-pass-filter-dTdz-dSdz.png :exports both
 
-def FindGaps(input):
+def FindSegments(input):
     '''
     Finds and return valid index ranges for the input time series.
     Input:
@@ -235,7 +237,9 @@ def smooth(x,window_len=11,window='hanning'):
     return y
 
 def SpectralDensity(input, nsmooth=5):
-
+    """ Calculates spectral density for longest valid segment
+    """
+    import scipy.signal as signal
     start, stop = FindLargestSegment(input)
     f, out = signal.periodogram(input[start:stop],
                                 fs=1.0, window='hamming')
@@ -246,7 +250,7 @@ def SpectralDensity(input, nsmooth=5):
 
 def FindLargestSegment(input):
 
-    start, stop = FindGaps(input)
+    start, stop = FindSegments(input)
     GapLength = stop-start+1
     imax = np.argmax(GapLength)
 
@@ -256,12 +260,26 @@ def HighPassButter(input, freq):
     import scipy.signal as signal
 
     b, a = signal.butter(1, freq/(1/2), btype='high')
-    start, stop = FindLargestSegment(input)
 
-    return signal.lfilter(b, a, input[start:stop])
+    return GappyFilter(input, b, a, 10)
+
+def GappyFilter(input, b, a, num_discard=None):
+    import scipy.signal as signal
+
+    segstart,segend = FindSegments(input)
+    out = np.empty(input.shape) * np.nan
+    for index, start in np.ndenumerate(segstart):
+        stop = segend[index]
+        out[start:stop] = signal.lfilter(b, a, input[start:stop])
+        if num_discard is not None:
+            out[start:start+num_discard] = np.nan
+            out[stop-num_discard:stop] = np.nan
+
+    return out
 
 def HighPassAndPlot(input, CutoffFreq, titlestr=None):
 
+    start, stop = FindLargestSegment(input)
     filtered = HighPassButter(input, CutoffFreq)
 
     f, InputSpec = SpectralDensity(input, 10)
@@ -276,19 +294,22 @@ def HighPassAndPlot(input, CutoffFreq, titlestr=None):
     plt.title(titlestr)
     plt.legend()
 
+    return filtered
+
 SzHistHr = (T1.S-T2.S)/np.abs(T1.z-T2.z)
 # interpolate 10 minute dT/dz to hourly time stamp like dS/dz
 TzHistHr = np.interp(T1.Stime, T1.time, TzHist)
 
 f, [ax1,ax2] = plt.subplots(2,1, sharex='all')
 plt.axes(ax1)
-HighPassAndPlot(TzHistHr, 1/6, titlestr='dT/dz')
+TzHi = HighPassAndPlot(TzHistHr, 1/6, titlestr='dT/dz')
 plt.axvline(1/24, color='gray', zorder=-10) # cutoff frequency
 plt.xlabel('')
 
 plt.axes(ax2)
-HighPassAndPlot(SzHistHr, 1/6, titlestr='dS/dz')
+SzHi = HighPassAndPlot(SzHistHr, 1/6, titlestr='dS/dz')
 plt.axvline(1/24, color='gray', zorder=-10) # cutoff frequency
+
 #+END_SRC
 
 #+RESULTS:
@@ -296,7 +317,60 @@ plt.axvline(1/24, color='gray', zorder=-10) # cutoff frequency
 
 Temperature has *strong* daily peak. Needs really strict filtering.
 Salinity not so much.
-** All times
+
+Step response
+#+BEGIN_SRC ipython :session :file images/temp/py49578oeU.png :exports both
+def mfreqz(b,a=1):
+    w,h = signal.freqz(b,a)
+    h_dB = 20 * log10 (abs(h))
+    subplot(211)
+    plot(w/max(w),h_dB)
+    ylim(-150, 5)
+    ylabel('Magnitude (db)')
+    xlabel(r'Normalized Frequency (x$\pi$rad/sample)')
+    title(r'Frequency response')
+    subplot(212)
+    h_Phase = unwrap(arctan2(imag(h),real(h)))
+    plot(w/max(w),h_Phase)
+    ylabel('Phase (radians)')
+    xlabel(r'Normalized Frequency (x$\pi$rad/sample)')
+    title(r'Phase response')
+    subplots_adjust(hspace=0.5)
+    show()
+
+def impz(b,a=1):
+
+    impulse = np.repeat(0,50);
+    impulse[0] =1.
+    x = np.arange(0,50)
+    response = signal.lfilter(b,a,impulse)
+    plt.subplot(211)
+    plt.stem(x, response)
+    plt.ylabel('Amplitude')
+    plt.xlabel(r'n (samples)')
+    plt.title(r'Impulse response')
+    plt.subplot(212)
+    step = np.cumsum(response)
+    plt.stem(x, step)
+    plt.ylabel('Amplitude')
+    plt.xlabel(r'n (samples)')
+    plt.title(r'Step response')
+    plt.subplots_adjust(hspace=0.5)
+    plt.show()
+
+
+import scipy.signal as signal
+b, a = signal.butter(1, (1/8)/(1/2), btype='high')
+impz(b, a)
+
+#+END_SRC
+
+#+RESULTS:
+[[file:images/temp/py49578oeU.png]]
+
+** Scatter plots of dT/dz & dS/dz
+Unfortunately, this doesn't look too promising. See below.
+*** All times
 #+BEGIN_SRC ipython :session :file /Users/dcherian/rama/scripts/images/dTdz-dSdz-RAMA13.png :exports both
 
 def JointPlot(Tz, Sz, titlestr=None, **kwargs):
@@ -310,8 +384,10 @@ def JointPlot(Tz, Sz, titlestr=None, **kwargs):
     if titlestr:
         ax[1].set_title(titlestr)
 
-JointPlot(TzHistHr, SzHistHr, titlestr='All data')
-
+sns.regplot(TzHi, SzHi, ci=None, marker='.');
+plt.xlabel('dT/dz')
+plt.ylabel('dS/dz')
+# JointPlot(TzHi, SzHi, titlestr='All data')
 #+END_SRC
 
 #+RESULTS:
@@ -319,7 +395,7 @@ JointPlot(TzHistHr, SzHistHr, titlestr='All data')
 1. S_z < 0 for the most part which makes sense.
 2. S_z has larger magnitude when T_z < 0 which also makes sense.
 
-** Divide into 4 seasons
+*** Divide into 4 seasons
 
 #+BEGIN_SRC ipython :session :file /Users/dcherian/rama/scripts/images/dTdz-dSdz-seasons.png :exports both
 def suplabel(axis,label,label_prop=None,
@@ -387,24 +463,23 @@ f, hax = plt.subplots(2,2, sharex=True, sharey=True)
 hax = hax.ravel()
 
 for idx,season in enumerate(['SW', 'SW→NE', 'NE', 'NE→SW']):
-    time,Tz = ReturnSeason(T1.Stime, TzHistHr, season)
-    time,Sz = ReturnSeason(T1.Stime, SzHistHr, season)
+    time,Tz = ReturnSeason(T1.Stime, TzHi, season)
+    time,Sz = ReturnSeason(T1.Stime, SzHi, season)
 
     sns.regplot(Tz, Sz, ax=hax[idx], ci=None, marker='.');
     hax[idx].axhline(0, color='gray')
     hax[idx].axvline(0, color='gray')
     hax[idx].set_title(season)
-    hax[idx].set_xlim([-0.1, 0.25])
-    hax[idx].set_ylim([-0.15, 0.05])
+    hax[idx].set_xlim([-0.03, 0.03])
+    hax[idx].set_ylim([-0.02, 0.02])
 
 label_prop=dict(fontsize=14)
 suplabel('y', 'dS/dz', labelpad=15, label_prop=label_prop)
 suplabel('x', 'dT/dz', labelpad=8, label_prop=label_prop)
-f.suptitle('RAMA 12N 90E, 15m - all data (hourly)')
+f.suptitle('RAMA 12N 90E, 15m - filtered hourly data')
 #+END_SRC
 
 #+RESULTS:
 [[file:/Users/dcherian/rama/scripts/images/dTdz-dSdz-seasons.png]]
 
-During the SW & NE monsoons, There is a tight cluster of points, relatively speaking.
-NE -> SW monsoon seems worst.
+All look kind of crap/OK.
