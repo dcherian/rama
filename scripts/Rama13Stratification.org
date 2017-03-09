@@ -19,14 +19,14 @@ mpl.rcParams['figure.figsize'] = [6.5, 6.5]
 mpl.rcParams['figure.dpi'] = 120
 mpl.rcParams['axes.facecolor'] = 'None'
 
-fname = '../RAMA13/new/526/input/dTdz_i.mat'
+fname = '../RAMA13/data/526/input/dTdz_i.mat'
 
-mat = hs.loadmat('../RAMA13/new/526/input/dTdz_i.mat')
+mat = hs.loadmat('../RAMA13/data/526/input/dTdz_i.mat')
 Tz_i = mat['Tz_i'];
 Tzi = np.squeeze(Tz_i['Tz12'])
 TziTime = np.squeeze(Tz_i['time'])
 
-mat = hs.loadmat('../RAMA13/new/526/input/dTdz_m.mat')
+mat = hs.loadmat('../RAMA13/data/526/input/dTdz_m.mat')
 Tz_m = mat['Tz_m'];
 Tzm = Tz_m['Tz'][0][0][0]
 TzmTime = Tz_m['time'][0][0][0]
