@@ -71,27 +71,26 @@ def ScatterSameTimeInterval(t1, v1, t2, v2, hax=None, guidelines=True):
 #+RESULTS:
 
 * Compare dT/dz between mooring and chipod
-#+BEGIN_SRC ipython :session :file /Users/dcherian/rama/scripts/images/mooring-chipod-dTdz.png :exports both
-f, (ax1, ax2) = plt.subplots(1,2)
-plt.axes(ax1)
-ScatterSameTimeInterval(TzmTime, Tzm, TziTime, Tzi)
-ax1.set_xlabel('Mooring dT/dz')
-ax1.set_ylabel('χ-pod dT/dz')
+#+BEGIN_SRC ipython :session :file images/mooring-chipod-dTdz.png :exports both
+  f, (ax1, ax2) = plt.subplots(1,2)
+  plt.axes(ax1)
+  ScatterSameTimeInterval(TzmTime, Tzm, TziTime, Tzi)
+  ax1.set_xlabel('Mooring dT/dz')
+  ax1.set_ylabel('χ-pod dT/dz')
 
-ax2.hist(Tzm[~np.isnan(Tzm)], bins=100, normed=True, alpha=0.5,
-         label='mooring')
-ax2.hist(Tzi[~np.isnan(Tzi)], bins=100, normed=True, alpha=0.5,
-         label='χ-pod')
-ax2.set_ylim([0, 4])
-ax2.set_xlim([-0.2, 0.2])
-ax2.legend()
-ax2.set_xlabel('dT/dz')
-ax2.set_ylabel('pdf')
-
+  ax2.hist(Tzm[~np.isnan(Tzm)], bins=100, normed=True, alpha=0.5,
+           label='mooring')
+  ax2.hist(Tzi[~np.isnan(Tzi)], bins=100, normed=True, alpha=0.5,
+           label='χ-pod')
+  ax2.set_ylim([0, 4])
+  ax2.set_xlim([-0.2, 0.2])
+  ax2.legend()
+  ax2.set_xlabel('dT/dz')
+  ax2.set_ylabel('pdf')
 #+END_SRC
 
 #+RESULTS:
-[[file:/Users/dcherian/rama/scripts/images/mooring-chipod-dTdz.png]]
+[[file:images/mooring-chipod-dTdz.png]]
 
 Seems like the χpod senses more temperature inversions; seems good.
 
@@ -99,7 +98,7 @@ The mooring sees higher temperature gradients on average but still some negative
 
 * T-S relation from mooring - historical data
 
-#+BEGIN_SRC ipython :session :file /Users/dcherian/rama/scripts/images/Tz-mooring-historical-RAMA13.png :exports both
+#+BEGIN_SRC ipython :session :file images/Tz-mooring-historical-RAMA13.png :exports both
 
 mat = loadmat('../processed/rama12n90e.mat', squeeze_me=True, struct_as_record=False)
 
@@ -138,7 +137,7 @@ plt.xlabel('dT/dz from mooring CTDs at 10m, 20m')
 #+END_SRC
 
 #+RESULTS:
-[[file:/Users/dcherian/rama/scripts/images/Tz-mooring-historical-RAMA13.png]]
+[[file:images/Tz-mooring-historical-RAMA13.png]]
 
 Looks pretty good, I say!
 
@@ -147,7 +146,7 @@ Looks pretty good, I say!
 As Emily pointed out, I should probably get rid of the daily cycle.
 I think we should go further and look at high-frequency variability only. The rest is not really relevant for χ really.
 
-#+BEGIN_SRC ipython :session :file /Users/dcherian/rama/scripts/images/high-pass-filter-dTdz-dSdz.png :exports both
+#+BEGIN_SRC ipython :session :file images/high-pass-filter-dTdz-dSdz.png :exports both
 
 def FindSegments(input):
     '''
@@ -313,7 +312,7 @@ plt.axvline(1/24, color='gray', zorder=-10) # cutoff frequency
 #+END_SRC
 
 #+RESULTS:
-[[file:/Users/dcherian/rama/scripts/images/high-pass-filter-dTdz-dSdz.png]]
+[[file:images/high-pass-filter-dTdz-dSdz.png]]
 
 Temperature has *strong* daily peak. Needs really strict filtering.
 Salinity not so much.
@@ -371,33 +370,63 @@ impz(b, a)
 ** Scatter plots of dT/dz & dS/dz
 Unfortunately, this doesn't look too promising. See below.
 *** All times
-#+BEGIN_SRC ipython :session :file /Users/dcherian/rama/scripts/images/dTdz-dSdz-RAMA13.png :exports both
+#+BEGIN_SRC ipython :session :file images/dTdz-dSdz-RAMA13.png :exports both
 
-def JointPlot(Tz, Sz, titlestr=None, **kwargs):
-    g = sns.jointplot(Tz, Sz,  marker='.', **kwargs)
-    g.set_axis_labels('dT/dz', 'dS/dz')
-    ax = g.fig.get_axes()
+  def GMregress(x, y):
+      import numpy as np
 
-    ax[0].axhline(0, color='gray')
-    ax[0].axvline(0, color='gray')
+      mask = ~(np.isnan(x) | np.isnan(y))
+      x = x[mask]; y = y[mask];
 
-    if titlestr:
-        ax[1].set_title(titlestr)
+      r = np.corrcoef(x, y)[0,1]
+      slope = np.sign(r) * np.std(y)/np.std(x)
 
-sns.regplot(TzHi, SzHi, ci=None, marker='.');
-plt.xlabel('dT/dz')
-plt.ylabel('dS/dz')
-# JointPlot(TzHi, SzHi, titlestr='All data')
+      return slope
+
+  def JointPlot(Tz, Sz, titlestr=None, **kwargs):
+      g = sns.jointplot(Tz, Sz,  marker='.', **kwargs)
+      g.set_axis_labels('dT/dz', 'dS/dz')
+      ax = g.fig.get_axes()
+
+      ax[0].axhline(0, color='gray')
+      ax[0].axvline(0, color='gray')
+
+      if titlestr:
+          ax[1].set_title(titlestr)
+
+  def GMregplot(x, y, ax=None):
+      import matplotlib.pyplot as plt
+
+      slope = GMregress(x, y)
+
+      if ax is None:
+          plt.figure()
+          ax = plt.gca()
+
+      ax.plot(x, y, 'k.')
+
+      xx = np.asarray(plt.xlim())
+      yy = slope * xx;
+      ax.hold(True)
+      ax.plot(xx, yy, 'r-')
+      ax.set_title('y = ' + "{0:.2f}".format(slope) + ' x')
+
+  # sns.regplot(TzHi, SzHi, ci=None, marker='.');
+
+  GMregplot(TzHi, SzHi)
+  plt.xlabel('dT/dz')
+  plt.ylabel('dS/dz')
+  # JointPlot(TzHi, SzHi, titlestr='All data')
 #+END_SRC
 
 #+RESULTS:
-[[file:/Users/dcherian/rama/scripts/images/dTdz-dSdz-RAMA13.png]]
+[[file:images/dTdz-dSdz-RAMA13.png]]
 1. S_z < 0 for the most part which makes sense.
 2. S_z has larger magnitude when T_z < 0 which also makes sense.
 
 *** Divide into 4 seasons
 
-#+BEGIN_SRC ipython :session :file /Users/dcherian/rama/scripts/images/dTdz-dSdz-seasons.png :exports both
+#+BEGIN_SRC ipython :session :file images/dTdz-dSdz-seasons.png :exports both
 def suplabel(axis,label,label_prop=None,
              labelpad=5,
              ha='center',va='center'):
@@ -466,10 +495,10 @@ for idx,season in enumerate(['SW', 'SW→NE', 'NE', 'NE→SW']):
     time,Tz = ReturnSeason(T1.Stime, TzHi, season)
     time,Sz = ReturnSeason(T1.Stime, SzHi, season)
 
-    sns.regplot(Tz, Sz, ax=hax[idx], ci=None, marker='.');
+    GMregplot(Tz, Sz, ax=hax[idx]);
     hax[idx].axhline(0, color='gray')
     hax[idx].axvline(0, color='gray')
-    hax[idx].set_title(season)
+    hax[idx].set_title(season + ' | ' + hax[idx].get_title())
     hax[idx].set_xlim([-0.03, 0.03])
     hax[idx].set_ylim([-0.02, 0.02])
 
@@ -480,6 +509,6 @@ f.suptitle('RAMA 12N 90E, 15m - filtered hourly data')
 #+END_SRC
 
 #+RESULTS:
-[[file:/Users/dcherian/rama/scripts/images/dTdz-dSdz-seasons.png]]
+[[file:images/dTdz-dSdz-seasons.png]]
 
 All look kind of crap/OK.
