@@ -1,0 +1,95 @@
+#+TITLE: Compare mooring & χ-pod sensors
+#+AUTHOR: Deepak Cherian
+#+DATE: 14 Mar 2017
+
+* Generic
+#+BEGIN_SRC ipython :session :exports both
+  %matplotlib inline
+  import numpy as np
+  import matplotlib as mpl
+  import matplotlib.pyplot as plt
+  import datetime as dt
+  import hdf5storage as hs
+  import scipy.io as spio
+
+  import sys
+  sys.path.append('/home/deepak/')
+  import dcpy.plots
+  import dcpy.util
+  import importlib
+  dcpy = importlib.reload(dcpy)
+
+  mpl.rcParams['savefig.transparent'] = True
+  mpl.rcParams['figure.figsize'] = [6.5, 6.5]
+  mpl.rcParams['figure.dpi'] = 120
+  mpl.rcParams['axes.facecolor'] = 'None'
+#+END_SRC
+
+#+RESULTS:
+
+#+BEGIN_SRC ipython :session
+  mat = spio.loadmat('../RAMA13/data/526/proc/temp.mat',
+                   struct_as_record=False, squeeze_me=True)
+  Tchi = mat['T'];
+  Tchi.time = dcpy.util.datenum2datetime(Tchi.time)
+
+  mat = hs.loadmat('../RAMA13/data/526/proc/T_m.mat',
+                  struct_as_record=False, squeeze_me=True)
+  Tctd1 = mat['T1']; Tctd2 = mat['T2'];
+  Tctd1.time = dcpy.util.datenum2datetime(Tctd1.time)
+  Tctd2.time = dcpy.util.datenum2datetime(Tctd2.time)
+#+END_SRC
+
+#+RESULTS:
+
+* Temperature
+** χ-pod 526 vs. CTD
+#+BEGIN_SRC ipython :session :exports both :file images/chipod-T-CTD-T.png
+  chirange = range(0, len(Tchi.time)-582*1000,30)
+
+  plt.figure()
+  plt.subplot2grid((4,2), (0,0), colspan=2)
+  plt.hold(True)
+  plt.plot_date(Tctd1.time, Tctd1.T, '-');
+  plt.plot_date(Tctd2.time, Tctd2.T, '-');
+  plt.plot_date(Tchi.time[chirange], Tchi.T1[chirange], '-');
+  plt.plot_date(Tchi.time[chirange], Tchi.T2[chirange], '-');
+  plt.legend(["CTD {0:.0f} m".format(Tctd1.z),
+	      "CTD {0:.0f} m".format(Tctd2.z),
+	      "χ-pod 15 m T₁", "χ-pod 15m T₂"])
+  plt.ylabel('Temperature (C)')
+
+  plt.subplot2grid((4,2), (1,0), colspan=2)
+  plt.hold(True)
+  plt.plot_date(Tchi.time[chirange], Tchi.T1[chirange], '-');
+  plt.plot_date(Tchi.time[chirange], Tchi.T2[chirange], '-');
+  plt.legend(["χ-pod 15 m T₁", "χ-pod 15m T₂"])
+  plt.ylabel('Temperature (C)')
+
+  plt.subplot2grid((4,2),(2,0))
+  plt.plot(Tctd1.T, Tctd2.T, '.')
+  plt.xlabel('CTD T at 10m');
+  plt.ylabel('CTD T at 20m');
+  dcpy.plots.line45()
+
+  plt.subplot2grid((4,2), (2,1))
+  plt.plot(Tchi.T1[chirange], Tchi.T2[chirange], '.')
+  plt.xlabel('χ-pod T₁')
+  plt.ylabel('χ-pod T₂')
+  dcpy.plots.line45()
+
+  plt.subplot2grid((4,2),(3,0))
+  T12 = (Tctd1.T + Tctd2.T)/2
+  Tchi12 = np.interp(mpl.dates.date2num(Tctd1.time),
+		     mpl.dates.date2num(Tchi.time[chirange]),
+		     (Tchi.T1[chirange] + Tchi.T2[chirange])/2)
+  plt.plot(T12, Tchi12, '.')
+  plt.xlabel('CTD (10m + 20m)/2')
+  plt.ylabel('χ-pod (T₁ + T₂)/2')
+  dcpy.plots.line45()
+  plt.grid()
+  plt.tight_layout()
+#+END_SRC
+#+RESULTS:
+[[file:images/chipod-T-CTD-T.png]]
+* χ estimates
