@@ -92,4 +92,53 @@
 #+END_SRC
 #+RESULTS:
 [[file:images/chipod-T-CTD-T.png]]
+** χ-pod 526 (15m) vs. 527 (30m)
+* Pitots : 526 (15m) vs. 527 (30m)
+#+BEGIN_SRC ipython :session :exports both :file images/RAMA13-526-527-pitot-compare.png
+  def LoadPitot(unit):
+
+    import numpy as np
+    dirname = '../RAMA13/data/' + unit + '/proc/Praw.mat'
+    pitot = hs.loadmat(dirname,
+   		       squeeze_me=True, struct_as_record=False)
+    pitot = pitot['Praw']
+    w = pitot['W'][0,0]
+    pitot['W'][0,0][w > 1] = np.nan
+    pitot['W'][0,0][w < 0.4] = np.nan
+    return pitot
+
+  def PlotPitotRawVoltage(pitot, hax=None):
+      import matplotlib.pyplot as plt
+      import hdf5storage as hs
+      import dcpy.util
+
+      if hax is None:
+          hax = plt.gca()
+
+      pitotrange = range(0, len(pitot['time'][0,0])-25000, 100)
+
+      hax.hold(True)
+      hax.plot_date(dcpy.util.datenum2datetime(pitot['time'][0,0][pitotrange]),
+                    pitot['W'][0,0][pitotrange], '-')
+      hax.set_ylabel('Raw Pitot voltage (V)')
+
+  p526 = LoadPitot('526')
+  p527 = LoadPitot('527')
+  PlotPitotRawVoltage(p526)
+  PlotPitotRawVoltage(p527)
+  plt.legend(['526 (15 m)', '527 (30 m)'])
+  plt.title('RAMA13 pitot raw voltages')
+
+  # import scipy.signal as signal
+  # b, a = signal.butter(1, (1/(40*24*60))/(1/20), 'high')
+  # w = p526['W'][0,0]
+
+  # plt.plot(dcpy.util.datenum2datetime(p526['time'][0,0][~np.isnan(w)]),
+  #          signal.filtfilt(b, a, w[~np.isnan(w)])
+  #          + np.nanmean(p527['W'][0,0]), zorder=0)
+#+END_SRC
+
+#+RESULTS:
+[[file:images/RAMA13-526-527-pitot-compare.png]]
+
 * χ estimates
