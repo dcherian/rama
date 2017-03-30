@@ -1,0 +1,302 @@
+#+TITLE: Process preliminary RAMA data
+#+AUTHOR: Deepak Cherian
+
+* emails
+** March 27, 2017
+Hi Deepak,
+I've placed two sets of pre-calibrated subsurface data into ftp://ftp.pmel.noaa.gov/OCRD/tao/ForDeepak/, as well as the post-calibrated salinity files from ra107 *(post cals are not available yet for the ra122 data)*. The ~.flg files are text files containing the data (with the pre or post-calibrations applied). The ~sum files are log files listing the instruments in each mooring along with some notes about them (we add more notes to these as we process the mooring). In the "postcal" directory you'll find, alongside the post-calibrated ~flg files, *two files containing the pre-cal and post-cal coefficients, in case you're curious (since they've already been applied, you most likely won't need them).* Note that in typical salinity processing,
+1. I would first flag data that appeared bad and unfixable,
+2. and then I'd apply a pre-to-post-cal linear interpolation across the data to correct for large-scale drifts (i.e. the first data value in the interpolated output would have a pre-cal applied, while the last value would have a post-cal applied, with the values interpolated in between).
+3. After that I'd compare the end points with previous and subsequent moorings at the same site, as well as any available CTDs,
+4. and I'd check inter-depth differences for density inversions.
+5. Using these three pieces of information, I'd manually adjust the data as needed (sometimes with dozens of adjustments needed to eliminate large-scale density inversions and bring various depths back into the mixed layer) before filtering them (into hourly data) and releasing them.
+
+I hope this helps. Take care and please let me know if you need anything else, -Sonya
+
+p.s. The 10m current data will be posted later, - I'll let you know when those are posted as well....
+* Functions
+
+#+BEGIN_SRC ipython :session :exports both :file images/temp/py30351WV1.png
+  import numpy as np
+  import matplotlib as mpl
+  import matplotlib.pyplot as plt
+  import datetime as dt
+
+  mpl.rcParams['savefig.transparent'] = True
+  mpl.rcParams['figure.figsize'] = [6.5, 6.5]
+  mpl.rcParams['figure.dpi'] = 180
+  mpl.rcParams['axes.facecolor'] = 'None'
+
+  # ra107['sal][ra107['sal'] > 40] = np.NaN
+
+  def CleanSalinity(salinity):
+    """ Adds NaNs in place of missing values. """
+    import numpy as np
+
+    salinity = np.float32(salinity)
+
+    if salinity > 39:
+      salinity = np.nan
+
+    return salinity
+
+  def ProcessDate(datestr):
+    """ Takes in string of form YYYYydayHHMM and returns python datetime object."""
+    import datetime as dt
+
+    year = int(datestr[0:4])
+    yday = int(datestr[4:7])
+    hour = int(datestr[7:9])
+    mins = int(datestr[9:11])
+
+    date = dt.datetime(year=year, month=1, day=1) \
+			     +  dt.timedelta(days=yday-1, hours=hour, minutes=mins)
+
+    return date
+
+  sal = np.dtype([('date', dt.datetime),
+		  ('sal', [('1', np.float32),
+                           ('10', np.float32),
+                           ('20', np.float32),
+                           ('40', np.float32),
+                           ('60', np.float32),
+                           ('100', np.float32)]),
+		  ('QQQQQQ', np.uint32),
+		  ('SSSSSS', np.uint32)])
+#+END_SRC
+
+* RAMA13 (ra-107)
+** read data
+#+BEGIN_SRC ipython :session :exports both
+  ra107pre = np.loadtxt('../TAO_raw/sal107a.flg', skiprows=5, dtype=sal,
+			converters={0:ProcessDate,
+			            1:CleanSalinity,
+			            2:CleanSalinity,
+			            3:CleanSalinity,
+			            4:CleanSalinity,
+			            5:CleanSalinity,
+			            6:CleanSalinity})
+
+  ra107post = np.loadtxt('../TAO_raw/postcal/sal107a.flg', skiprows=5, dtype=sal,
+			 converters={0:ProcessDate,
+			             1:CleanSalinity,
+			             2:CleanSalinity,
+			             3:CleanSalinity,
+			             4:CleanSalinity,
+			             5:CleanSalinity,
+			             6:CleanSalinity})
+#+END_SRC
+
+#+RESULTS:
+
+** Difference between pre- and post-salinity.
+
+Post-cal salinity is roughly 0.05 psu lower everywhere.
+#+BEGIN_SRC ipython :session :exports both :file images/rama13-sal-pre-post-cal.png
+
+  plt.plot_date(ra107pre['date'],
+		ra107pre['sal']['10'] - ra107post['sal']['10'], '-')
+  plt.title('RAMA13 pre-cal salinity - post-cal salinity')
+#+END_SRC
+
+#+RESULTS:
+[[file:images/rama13-sal-pre-post-cal.png]]
+** Interpolate pre- and post-cal
+From Sonya:
+#+BEGIN_quote
+  I'd apply a pre-to-post-cal linear interpolation across the data to correct for large-scale drifts (i.e. the first data value in the interpolated output would have a pre-cal applied, while the last value would have a post-cal applied, with the values interpolated in between).
+#+END_QUOTE
+
+#+BEGIN_SRC ipython :session :exports both :file images/rama13-interp-pre-post-sal.png
+
+  ra107 = ra107post.copy() # create copy
+
+  Ntime = len(ra107['date'])
+
+  weight_pre = np.arange(Ntime-1,-1,-1)/(Ntime-1)
+  weight_post = np.arange(0,Ntime)/(Ntime-1)
+
+  for depth in ra107['sal'].dtype.names:
+      ra107['sal'][depth] = weight_pre * ra107pre['sal'][depth] \
+                            + weight_post * ra107post['sal'][depth]
+
+  depth = '10'
+  plt.figure()
+  plt.plot(ra107['sal'][depth] - ra107pre['sal'][depth], label='interp-pre')
+  plt.plot(ra107['sal'][depth] - ra107post['sal'][depth], label='interp-post')
+  plt.axhline(0)
+  plt.legend()
+  plt.title(depth + 'm depth')
+#+END_SRC
+
+#+RESULTS:
+[[file:images/rama13-interp-pre-post-sal.png]]
+
+Nothing crazy in the interpolated product. Spiky at the surface, perhaps that's expected.
+
+#+BEGIN_SRC ipython :session :exports both :file images/rama13-interp-salinity.png
+  plt.figure()
+
+  for depth in ra107['sal'].dtype.names:
+	plt.plot_date(ra107['date'][0:-1:6],
+                      ra107['sal'][depth][0:-1:6], '-',
+                      label=depth, linewidth=1)
+
+  plt.legend()
+  plt.title('ra-107 / RAMA13 interpolated pre-cal post-cal salinity product')
+
+#+END_SRC
+
+#+RESULTS:
+[[file:images/rama13-interp-salinity.png]]
+* RAMA14 (ra-122)
+
+#+BEGIN_SRC ipython :session :exports both
+  ra122 = np.loadtxt('../TAO_raw/sal122a.flg', skiprows=5, dtype=sal,
+		     converters={0:ProcessDate,
+				 1:CleanSalinity,
+				 2:CleanSalinity,
+				 3:CleanSalinity,
+				 4:CleanSalinity,
+				 5:CleanSalinity,
+				 6:CleanSalinity})
+#+END_SRC
+
+#+RESULTS:
+
+#+BEGIN_SRC ipython :session :exports both :file images/rama14-pre-cal-salinity.png
+    plt.figure()
+
+    for depth in ra122['sal'].dtype.names:
+	  plt.plot_date(ra122['date'][0:-1:6],
+			ra122['sal'][depth][0:-1:6], '-',
+			label=depth, linewidth=1)
+
+    plt.legend()
+    plt.title('ra-122 / RAMA14 pre-cal salinity product')
+#+END_SRC
+
+#+RESULTS:
+[[file:images/rama14-pre-cal-salinity.png]]
+
+* Full record
+** What are the differences between end of RAMA13 and start of RAMA14
+
+#+BEGIN_SRC ipython :session :exports both
+  ramadiff = np.dtype([('depth', np.int32),
+                       ('ΔS', np.float32),
+                       ('Δt', dt.timedelta)])
+
+  diff = np.zeros((6,), dtype=ramadiff)
+
+  for index,depth in enumerate(ra107['sal'].dtype.names):
+      r13 = ra107['sal'][depth]
+      sal13 = r13[~np.isnan(r13)]
+      date13 = ra107['date'][~np.isnan(r13)]
+
+      diff[index] = (int(depth),
+                     ra122['sal'][depth][0] - r13[-1],
+                     ra122['date'][0] - date13[-1])
+
+  diff
+#+END_SRC
+
+#+RESULTS:
+: array([(  1,         nan, datetime.timedelta(27, 61200)),
+:        ( 10,  0.02700043, datetime.timedelta(0, 46200)),
+:        ( 20,  0.01599884, datetime.timedelta(0, 46200)),
+:        ( 40,  0.47800064, datetime.timedelta(0, 46200)),
+:        ( 60,  0.0359993 , datetime.timedelta(0, 46200)),
+:        (100,  0.00300217, datetime.timedelta(0, 46200))],
+:       dtype=[('depth', '<i4'), ('ΔS', '<f4'), ('Δt', 'O')])
+
+(depth, ΔS, Δtime)
+
+Surface instrument failed a month before recovery.
+
+The rest seem OK except for the 40m instrument.
+
+ During recovery/deployment there is a big jump of 0.5 psu at the 40m instrument
+
+#+BEGIN_SRC ipython :session :exports both :file images/ra07-ra122-switch-period.png
+  for index, depth in enumerate(ra107['sal'].dtype.names):
+      if index == 0:
+          continue
+
+      hax = plt.subplot(6,1,index+1)
+
+      plt.plot_date(ra107['date'][-100:-1],
+	            ra107['sal'][depth][-100:-1],
+	            'k*-', linewidth=1)
+      plt.plot_date(ra122['date'][0:100],
+	            ra122['sal'][depth][0:100],
+	            'k*-', linewidth=1)
+
+      if index < 5:
+          hax.set_xticklabels([], visible=False)
+
+      plt.title(depth+'m')
+
+  plt.tight_layout()
+#+END_SRC
+
+#+RESULTS:
+[[file:images/ra07-ra122-switch-period.png]]
+
+** Plot full record
+
+#+BEGIN_SRC ipython :session :exports both :file images/rama13-rama14-full-salinity.png
+
+  dt = 1
+  for index, depth in enumerate(ra107['sal'].dtype.names):
+       hax = plt.subplot(6,1,index+1)
+       rama = ra107
+       plt.plot_date(rama['date'][0:-1:dt],
+	             rama['sal'][depth][0:-1:dt], 'k-',
+	             label=depth, linewidth=1)
+
+       rama = ra122
+       plt.plot_date(rama['date'][0:-1:dt],
+	             rama['sal'][depth][0:-1:dt], 'k-',
+	             label=depth, linewidth=1)
+       plt.title(depth + 'm')
+       if index == 0:
+           plt.title('RAMA 13 & 14 salinity | 1m')
+
+       plt.ylim([31.5, 35.5])
+       if index < 5:
+            hax.set_xticklabels(labels=[], visible=False)
+
+  plt.tight_layout()
+#+END_SRC
+
+#+RESULTS:
+[[file:images/rama13-rama14-full-salinity.png]]
+
+40m and 60m  instruments seem to be a lot noisier! let's check distribution / variances - variances are only slightly higher.
+
+#+BEGIN_SRC ipython :session :exports both :file images/rama13-rama14-sal-histograms.png
+  def dcHist(var, bins=100, **kwargs):
+    import numpy as np
+    mpl.rcParams['figure.facecolor'] = 'None'
+    plt.hist(var[~np.isnan(var)], bins,
+             normed=True, alpha=0.7, **kwargs)
+
+  for index, depth in enumerate(ra107['sal'].dtype.names):
+    plt.subplot(3,2,index+1)
+    dcHist(ra107['sal'][depth], label='13/107')
+    dcHist(ra122['sal'][depth], label='14/122')
+    plt.title(depth + 'm | var = '
+              + str(np.nanvar(ra107['sal'][depth]))[0:5]
+              + ' | var = '
+              + str(np.nanvar(ra122['sal'][depth]))[0:5])
+    if index == 0:
+      plt.legend()
+
+  plt.suptitle('Normalized histogram for 10min salinity', va='bottom')
+  plt.tight_layout()
+
+#+END_SRC
+
+#+RESULTS:
+[[file:images/rama13-rama14-sal-histograms.png]]
