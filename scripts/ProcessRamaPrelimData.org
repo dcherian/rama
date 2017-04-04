@@ -1,22 +1,31 @@
 #+TITLE: Process preliminary RAMA data
 #+AUTHOR: Deepak Cherian
+#+OPTIONS: timestamp:nil title:t html5-fancy:t html-style:nil html-scripts:nil
 
+#+LATEX_CLASS: dcnotebook
+
+#+HTML_HEAD: <link rel="stylesheet" href="notebook.css" type="text/css" />
 * emails
-** March 27, 2017
+** March 27, 2017 Sonya
+#+BEGIN_QUOTE
+
 Hi Deepak,
+
 I've placed two sets of pre-calibrated subsurface data into ftp://ftp.pmel.noaa.gov/OCRD/tao/ForDeepak/, as well as the post-calibrated salinity files from ra107 *(post cals are not available yet for the ra122 data)*. The ~.flg files are text files containing the data (with the pre or post-calibrations applied). The ~sum files are log files listing the instruments in each mooring along with some notes about them (we add more notes to these as we process the mooring). In the "postcal" directory you'll find, alongside the post-calibrated ~flg files, *two files containing the pre-cal and post-cal coefficients, in case you're curious (since they've already been applied, you most likely won't need them).* Note that in typical salinity processing,
 1. [X] I would first flag data that appeared bad and unfixable,
 2. [X] and then I'd apply a pre-to-post-cal linear interpolation across the data to correct for large-scale drifts (i.e. the first data value in the interpolated output would have a pre-cal applied, while the last value would have a post-cal applied, with the values interpolated in between).
-3. [X] cAfter that I'd compare the end points with previous and subsequent moorings at the same site, as well as any available CTDs,
+3. [X] After that I'd compare the end points with previous and subsequent moorings at the same site, as well as any available CTDs,
 4. [ ] and I'd check inter-depth differences for density inversions.
 5. [ ] Using these three pieces of information, I'd manually adjust the data as needed (sometimes with dozens of adjustments needed to eliminate large-scale density inversions and bring various depths back into the mixed layer) before filtering them (into hourly data) and releasing them.
 
 I hope this helps. Take care and please let me know if you need anything else, -Sonya
 
 p.s. The 10m current data will be posted later, - I'll let you know when those are posted as well....
-* Functions
 
-#+BEGIN_SRC ipython :session :tangle yes :exports results
+#+END_QUOTE
+* Functions :noexport:
+
+#+BEGIN_SRC ipython :session :tangle yes :eval never-export :exports results
   import numpy as np
   import matplotlib as mpl
   import matplotlib.pyplot as plt
@@ -101,7 +110,7 @@ From Sonya:
   I'd apply a /pre-to-post-cal linear interpolation/ across the data to correct for large-scale drifts (i.e. the first data value in the interpolated output would have a pre-cal applied, while the last value would have a post-cal applied, with the values interpolated in between).
 #+END_QUOTE
 
-#+BEGIN_SRC ipython :session :tangle yes :exports results
+#+BEGIN_SRC ipython :session :tangle yes :eval never-export :exports results
 
   cnv = {0:ProcessDate}
   for jj in np.arange(1,7):
@@ -159,7 +168,7 @@ From Sonya:
 *** Difference between pre- and post-salinity.
 
 Post-cal salinity is roughly 0.05 psu lower everywhere.
-#+BEGIN_SRC ipython :session :tangle yes :exports results :file images/rama13-sal-pre-post-cal.png
+#+BEGIN_SRC ipython :session :tangle yes :eval never-export :exports results :file images/rama13-sal-pre-post-cal.png
 
   plt.plot_date(ra107pre['date'],
 		ra107pre['sal']['10'] - ra107post['sal']['10'], '-')
@@ -169,7 +178,7 @@ Post-cal salinity is roughly 0.05 psu lower everywhere.
 #+RESULTS:
 [[file:images/rama13-sal-pre-post-cal.png]]
 *** Compare pre- and post-cal
-#+BEGIN_SRC ipython :session :tangle yes :exports results :file images/rama13-interp-pre-post-sal.png
+#+BEGIN_SRC ipython :session :tangle yes :eval never-export :exports results :file images/rama13-interp-pre-post-sal.png
   depth = '10'
   plt.figure()
   plt.plot(ra107['sal'][depth] - ra107['sal-pre'][depth], label='interp-pre')
@@ -184,7 +193,7 @@ Post-cal salinity is roughly 0.05 psu lower everywhere.
 
 Nothing crazy in the interpolated product. Spiky at the surface, perhaps that's expected.
 
-#+BEGIN_SRC ipython :session :tangle yes :exports results :file images/rama13-interp-salinity.png
+#+BEGIN_SRC ipython :session :tangle yes :eval never-export :exports results :file images/rama13-interp-salinity.png
   plt.figure()
 
   for depth in ra107['sal'].dtype.names:
@@ -205,7 +214,7 @@ This is the same as date read from pre-cal .flg file.
 
 There is no post-cal for temperature.
 
-#+BEGIN_SRC ipython :session :tangle no :exports none
+#+BEGIN_SRC ipython :session :tangle yes :eval never-export :exports none
   tempfilename = '../t12n90e_10m.cdf'
 
   import netCDF4 as nc
@@ -240,7 +249,7 @@ There is no post-cal for temperature.
 
 #+RESULTS:
 *** Compare fully-processed and "preliminary" data = no difference :noexport:
-#+BEGIN_SRC ipython :session :tangle yes :exports none :file images/ra107-pre-proc-temp.png
+#+BEGIN_SRC ipython :session :tangle yes :eval never-export :exports none :file images/ra107-pre-proc-temp.png
   for index, zz in enumerate(['1', '10', '20', '40']):
       plt.subplot(4,1,index+1)
       plt.plot_date(ra107['date'],
@@ -253,7 +262,7 @@ There is no post-cal for temperature.
 
 * RAMA14 (ra-122)
 
-#+BEGIN_SRC ipython :session :tangle yes :exports results
+#+BEGIN_SRC ipython :session :tangle yes :eval never-export :exports results
   ra122read = np.loadtxt('../TAO_raw/sal122a.flg', skiprows=5, dtype=sal,
 			 converters={0:ProcessDate,
 			             1:CleanSalinity,
@@ -271,7 +280,7 @@ There is no post-cal for temperature.
 
 #+RESULTS:
 
-#+BEGIN_SRC ipython :session :tangle yes :exports results :file images/rama14-pre-cal-salinity.png
+#+BEGIN_SRC ipython :session :tangle yes :eval never-export :exports results :file images/rama14-pre-cal-salinity.png
     plt.figure()
 
     for depth in ra122['sal'].dtype.names:
@@ -289,7 +298,7 @@ There is no post-cal for temperature.
 * Full salinity record
 ** What are the differences between end of RAMA13 and start of RAMA14
 
-#+BEGIN_SRC ipython :session :tangle yes :exports results
+#+BEGIN_SRC ipython :session :tangle yes :eval never-export :exports results
   ramadiff = np.dtype([('depth', np.int32),
                        ('ΔS', np.float32),
                        ('Δt', dt.timedelta)])
@@ -323,7 +332,7 @@ ra107 surface instrument failed a month before recovery.
 
 The rest seem OK except for the 40m instrument: during recovery/deployment there is a big jump of 0.5 psu.
 
-#+BEGIN_SRC ipython :session :tangle yes :exports results :file images/ra07-ra122-switch-period.png
+#+BEGIN_SRC ipython :session :tangle yes :eval never-export :exports results :file images/ra07-ra122-switch-period.png
   for index, depth in enumerate(ra107['sal'].keys()):
       if index == 0:
           continue
@@ -350,7 +359,7 @@ The rest seem OK except for the 40m instrument: during recovery/deployment there
 
 ** Plot full record - 10 min salinity
 
-#+BEGIN_SRC ipython :session :tangle yes :exports results :file images/rama13-rama14-full-salinity.png
+#+BEGIN_SRC ipython :session :tangle yes :eval never-export :exports results :file images/rama13-rama14-full-salinity.png
 
   dtime = 1
   for index, depth in enumerate(ra107['sal'].keys()):
@@ -380,7 +389,7 @@ The rest seem OK except for the 40m instrument: during recovery/deployment there
 
 40m and 60m  instruments seem to be a lot noisier! let's check distribution / variances - variances are only slightly higher.
 
-#+BEGIN_SRC ipython :session :tangle yes :exports results :file images/rama13-rama14-sal-histograms.png
+#+BEGIN_SRC ipython :session :tangle yes :eval never-export :exports results :file images/rama13-rama14-sal-histograms.png
   def dcHist(var, bins=100, **kwargs):
     import numpy as np
     mpl.rcParams['figure.facecolor'] = 'None'
@@ -409,7 +418,7 @@ The rest seem OK except for the 40m instrument: during recovery/deployment there
 ** How many exist in 10 minute data
 
 The percentage of valid data that yields N² < 0 at 15m & 30m (chipod depths) are
-#+BEGIN_SRC ipython :session :exports results
+#+BEGIN_SRC ipython :session :eval never-export :exports results
   import seawater as sw
 
   ra107['salarr'] = np.array([ra107['sal']['10'],
@@ -440,7 +449,7 @@ The percentage of valid data that yields N² < 0 at 15m & 30m (chipod depths) ar
 
 ** Where do these occur?
 
-#+BEGIN_SRC ipython :session :tangle yes :exports results :file images/rama13-N2-negative.png
+#+BEGIN_SRC ipython :session :tangle yes :eval never-export :exports results :file images/rama13-N2-negative.png
 
   for index,zz in enumerate(['10', '20', '40']):
       plt.subplot(3,1,index+1)
@@ -467,9 +476,11 @@ The percentage of valid data that yields N² < 0 at 15m & 30m (chipod depths) ar
 [[file:images/rama13-N2-negative.png]]
 ** Compare with density from .flg file
 
-Using density from .flg files is consistent.
+Using density from .flg files is consistent. There seem be a lot of density inversions between 10m and 20m depths; especially at the beginning of the record.
 
-#+BEGIN_SRC ipython :session :tangle yes :exports file :results images/temp/sdasd.png
+winter convection?
+
+#+BEGIN_SRC ipython :session :tangle yes :eval never-export :exports results file :file images/rama13-density-diff.png
   ra107['densarr'] = np.array([ra107['dens']['10'],
 			       ra107['dens']['20'],
 			       ra107['dens']['40']])
@@ -478,17 +489,37 @@ Using density from .flg files is consistent.
   N2[0,:] = -9.81/1028 * (ra107['dens']['10']-ra107['dens']['20'])/10
   N2[1,:] = -9.81/1028 * (ra107['dens']['20']-ra107['dens']['40'])/20
 
-  plt.subplot(211)
-  plt.plot(ra107['dens-pre']['20'] - ra107['dens-pre']['10'])
+  tend = 500;
+  monthsFmt = mpl.dates.DateFormatter("%d-%m")
+  hax = plt.subplot(211)
+  plt.plot(ra107['date'],
+           ra107['dens-pre']['20'] - ra107['dens-pre']['10'], linewidth=1)
   plt.axhline(0, color='k')
   plt.ylabel('Δρ 20m-10m')
+  hax.xaxis.set_major_formatter(monthsFmt)
 
   plt.subplot(212)
-  plt.plot(ra107['dens-pre']['40'] - ra107['dens-pre']['20'])
+  plt.plot_date(ra107['date'], ra107['dens-pre']['40'] - ra107['dens-pre']['20'], '-', linewidth=1)
   plt.axhline(0, color='k')
   plt.ylabel('Δρ 40m-20m')
+
 
 #+END_SRC
 
 #+RESULTS:
-[[file:images/temp/sdasd.png]]
+[[file:images/rama13-density-diff.png]]
+
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/rama13-dens-inversion-zoom.png
+  tend = 500;
+  monthsFmt = mpl.dates.DateFormatter("%d-%m")
+
+  plt.plot(ra107['date'][0:tend],
+           ra107['dens-pre']['20'][0:tend] - ra107['dens-pre']['10'][0:tend], linewidth=1)
+  plt.axhline(0, color='k')
+  plt.ylabel('Δρ 20m-10m')
+  hax.xaxis.set_major_formatter(monthsFmt)
+
+#+END_SRC
+
+#+RESULTS:
+[[file:images/rama13-dens-inversion-zoom.png]]
