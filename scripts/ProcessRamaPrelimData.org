@@ -30,6 +30,8 @@ p.s. The 10m current data will be posted later, - I'll let you know when those a
   import matplotlib as mpl
   import matplotlib.pyplot as plt
   import datetime as dt
+  import cmocean as cmo
+  from copy import copy
 
   mpl.rcParams['savefig.transparent'] = True
   mpl.rcParams['figure.figsize'] = [6.5, 6.5]
@@ -259,6 +261,281 @@ There is no post-cal for temperature.
 
 #+RESULTS:
 [[file:ra107-pre-proc-temp.png]]
+** Density inversions
+*** How many exist in 10 minute data
+
+The percentage of valid data with N² < 0
+#+BEGIN_SRC ipython :session :eval never-export :exports results
+  import seawater as sw
+
+  ra107['salarr'] = np.array([ra107['sal']['1'],
+			      ra107['sal']['10'],
+			      ra107['sal']['20'],
+			      ra107['sal']['40'],
+			      ra107['sal']['60'],
+			      ra107['sal']['100']])
+
+  ra107['temparr'] = np.array([ra107['temp']['1'],
+			       ra107['temp']['10'],
+			       ra107['temp']['20'],
+			       ra107['temp']['40'],
+			       ra107['temp']['60'],
+			       ra107['temp']['100']])
+
+  ra107['densarr'] = np.array([ra107['dens']['1'],
+			       ra107['dens']['10'],
+			       ra107['dens']['20'],
+			       ra107['dens']['40'],
+			       ra107['dens']['60'],
+			       ra107['dens']['100']])
+
+  ra107['presarr'] = np.array([1*np.ones(ra107['temp']['1'].shape),
+			       10*np.ones(ra107['temp']['1'].shape),
+			       20*np.ones(ra107['temp']['1'].shape),
+			       40*np.ones(ra107['temp']['1'].shape),
+			       60*np.ones(ra107['temp']['1'].shape),
+			       100*np.ones(ra107['temp']['1'].shape)])
+
+  dSdz = -np.diff(ra107['salarr'], axis=0)/np.diff(ra107['presarr'], axis=0)
+  dTdz = -np.diff(ra107['temparr'], axis=0)/np.diff(ra107['presarr'], axis=0)
+
+
+  N2,_,p_ave = sw.bfrq(ra107['salarr'], ra107['temparr'], ra107['presarr'], 12)
+  ra107['N2'] = N2
+
+  # Percentage of valid data that yields N² < 0
+  mask1 = ~np.isnan(N2[1,:])
+  mask2 = ~np.isnan(N2[2,:])
+
+  table = [list(p_ave[:,0]),
+           [np.round(len(n[n<0])/len(n)*100) for n in # % N² < 0
+            [N2[i,~np.isnan(N2[i,:])] for i in range(N2.shape[0])]],
+           [np.round(len(s[s>0])/len(s)*100) for s in # % dS/dz > 0
+            [dSdz[i,~np.isnan(dSdz[i,:])] for i in range(dSdz.shape[0])]],
+           [np.round(len(s[s<0])/len(s)*100) for s in # % dT/dz > 0
+            [dTdz[i,~np.isnan(dTdz[i,:])] for i in range(dTdz.shape[0])]]]
+
+  table[0].insert(0, 'Depth (m)')
+  table[1].insert(0, '% N² < 0')
+  table[2].insert(0, '% dS/dz > 0')
+  table[3].insert(0, '% dT/dz < 0')
+
+  table
+#+END_SRC
+
+#+RESULTS:
+| Depth (m)   |  5.5 | 15.0 | 30.0 | 50.0 | 80.0 |
+| % N² < 0    | 61.0 | 12.0 | 21.0 |  0.0 |  0.0 |
+| % dS/dz > 0 | 53.0 | 19.0 | 28.0 |  1.0 | 15.0 |
+| % dT/dz < 0 | 69.0 | 47.0 | 23.0 |  7.0 |  0.0 |
+
+*** Where do these occur?
+
+#+BEGIN_SRC ipython :session :tangle yes :eval never-export :exports results :file images/rama13-N2-negative.png
+
+  for index,zz in enumerate(['10', '20', '40']):
+      plt.subplot(3,1,index+1)
+      datenum = mpl.dates.date2num(ra107['date'])
+      plt.plot(datenum, ra107['sal'][zz], 'k-',
+	       linewidth=1)
+      if index == 0:
+          mask = ra107['N2'][0,:] < 0
+
+      if index == 1:
+          mask = np.logical_or(ra107['N2'][0,:] < 0,
+                               ra107['N2'][1,:] < 0)
+
+      if index == 1:
+          mask = ra107['N2'][1,:] < 0
+
+      plt.plot(datenum[mask], ra107['sal'][zz][mask],
+	       'r.', markersize=2)
+
+      # plt.xlim([735260, 735280])
+#+END_SRC
+
+#+RESULTS:
+[[file:images/rama13-N2-negative.png]]
+*** Compare with density from .flg file
+
+Using density from .flg files is consistent. There seem be a lot of density inversions between 10m and 20m depths; especially at the beginning of the record.
+
+winter convection?
+
+#+BEGIN_SRC ipython :session :tangle yes :eval never-export :exports results :file images/rama13-density-diff.png
+  N2 = np.zeros([2, len(ra107['dens']['10'])])
+  N2[0,:] = -9.81/1028 * (ra107['dens']['10']-ra107['dens']['20'])/10
+  N2[1,:] = -9.81/1028 * (ra107['dens']['20']-ra107['dens']['40'])/20
+
+  tend = 500;
+  monthsFmt = mpl.dates.DateFormatter("%d-%m")
+  hax = plt.subplot(311)
+  plt.plot(ra107['date'],
+           ra107['dens']['10'] - ra107['dens']['1'], linewidth=1)
+  plt.axhline(0, color='k')
+  plt.ylabel('Δρ 10m-1m')
+  hax.xaxis.set_major_formatter(monthsFmt)
+
+  hax = plt.subplot(312)
+  plt.plot(ra107['date'],
+           ra107['dens']['20'] - ra107['dens']['10'], linewidth=1)
+  plt.axhline(0, color='k')
+  plt.ylabel('Δρ 20m-10m')
+  hax.xaxis.set_major_formatter(monthsFmt)
+
+  hax = plt.subplot(313)
+  plt.plot_date(ra107['date'], ra107['dens']['40'] - ra107['dens']['20'], '-', linewidth=1)
+  plt.axhline(0, color='k')
+  plt.ylabel('Δρ 40m-20m')
+  hax.xaxis.set_major_formatter(monthsFmt)
+
+#+END_SRC
+
+#+RESULTS:
+[[file:images/rama13-density-diff.png]]
+
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/rama13-dens-inversion-zoom.png
+  tend = 500;
+  monthsFmt = mpl.dates.DateFormatter("%d-%m")
+
+  plt.plot(ra107['date'][0:tend],
+           ra107['dens']['20'][0:tend] - ra107['dens']['10'][0:tend], linewidth=1)
+  plt.axhline(0, color='k')
+  plt.ylabel('Δρ 20m-10m')
+  hax.xaxis.set_major_formatter(monthsFmt)
+
+#+END_SRC
+
+#+RESULTS:
+[[file:images/rama13-dens-inversion-zoom.png]]
+
+*** Funny density offset/trends appear to result from salinity.
+#+BEGIN_SRC ipython :session :tangle yes :eval never-export :exports results :file images/rama13-sal-diff.png
+  N2 = np.zeros([2, len(ra107['sal']['10'])])
+  N2[0,:] = -9.81/1028 * (ra107['sal']['10']-ra107['sal']['20'])/10
+  N2[1,:] = -9.81/1028 * (ra107['sal']['20']-ra107['sal']['40'])/20
+
+  limy = [-0.2, 0.4]
+
+  tend = 500;
+  monthsFmt = mpl.dates.DateFormatter("%d-%m")
+  hax = plt.subplot(311)
+  plt.plot(ra107['date'],
+           ra107['sal']['10'] - ra107['sal']['1'], linewidth=1)
+  plt.axhline(0, color='k')
+  plt.ylabel('ΔS 10m-1m')
+  plt.ylim(limy)
+  hax.xaxis.set_major_formatter(monthsFmt)
+
+  hax = plt.subplot(312)
+  plt.plot(ra107['date'],
+           ra107['sal']['20'] - ra107['sal']['10'], linewidth=1)
+  plt.axhline(0, color='k')
+  plt.ylabel('ΔS 20m-10m')
+  plt.ylim(limy)
+  hax.xaxis.set_major_formatter(monthsFmt)
+
+  hax = plt.subplot(313)
+  plt.plot_date(ra107['date'], ra107['sal']['40'] - ra107['sal']['20'], '-', linewidth=1)
+  plt.axhline(0, color='k')
+  plt.ylabel('ΔS 40m-20m')
+  plt.ylim(limy)
+  hax.xaxis.set_major_formatter(monthsFmt)
+
+  plt.show()
+#+END_SRC
+
+#+RESULTS:
+[[file:images/rama13-sal-diff.png]]
+*** Contributors to negative N²
+Salinity appears to be the controlling factor generally.
+
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/rama13-dρdz.png
+
+  class MidpointNormalize(mpl.colors.Normalize):
+      def __init__(self, vmin=None, vmax=None, midpoint=None, clip=False):
+          self.midpoint = midpoint
+          mpl.colors.Normalize.__init__(self, vmin, vmax, clip)
+
+      def __call__(self, value, clip=None):
+          # I'm ignoring masked values and all kinds of edge cases to make a
+          # simple example...
+          x, y = [self.vmin, self.midpoint, self.vmax], [0, 0.5, 1]
+          return np.ma.masked_array(np.interp(value, x, y))
+
+  tindex = np.arange(0,dSdz.shape[1])
+  # ra107['N2'][ra107['N2'] > 0.05] = np.nan;
+
+  hax = plt.subplot(311)
+  plt.pcolormesh(tindex, -ra107['presarr'],
+		 1e6*-7.6e-5*np.ma.masked_array(dSdz, np.isnan(dSdz)),
+		 norm=MidpointNormalize(midpoint=0.),
+		 cmap=cmo.cm.balance)
+  plt.title('β dS/dz * 1e6')
+  plt.clim(-3, 12)
+  plt.colorbar(extend='min')
+
+  hax = plt.subplot(312)
+  plt.pcolormesh(tindex, -ra107['presarr'],
+		 1e6*-1.7e-4*np.ma.masked_array(dTdz, np.isnan(dTdz)),
+		 norm=MidpointNormalize(midpoint=0.),
+		 cmap=cmo.cm.balance)
+  plt.colorbar(extend='min')
+  plt.clim(-3, 12)
+  plt.title('-α dT/dz * 1e6')
+
+  hax = plt.subplot(313)
+  mycmap = copy(cmo.cm.ice_r)
+  mycmap.set_bad(color='w')
+  mycmap.set_under(color='r')
+  mynorm = mpl.colors.Normalize(vmin=0., vmax=np.nanmax(ra107['N2']))
+
+  plt.pcolormesh(tindex, -ra107['presarr'],
+		 np.ma.masked_array(ra107['N2'], np.isnan(ra107['N2'])),
+		 cmap=mycmap, norm=mynorm)
+  plt.axhline(-15, color='k'); plt.axhline(-30, color='k')
+  plt.colorbar(extend='min')
+  plt.title('N² (negative in red)')
+
+  plt.tight_layout()
+  plt.show()
+
+#+END_SRC
+
+#+RESULTS:
+[[file:images/rama13-dρdz.png]]
+
+Let's try a better way.
+
+Looks like both dT/dz < 0, dS/dz > 0 (colder, saltier water on top) are responsible.
+
+Though most points have dS/dz > 0.
+
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/rama13-neg-N²-scatter.png
+
+  for ii in [1,2]:
+      plt.subplot(1,2,ii)
+      mask = N2[ii,:] < 0
+      plt.hexbin(7.6e-1*dSdz[ii,mask], 1.7*dTdz[ii,mask], mincnt=10)
+      plt.axis('square')
+      plt.axhline(0, color='k', alpha=0.5);
+      plt.axvline(0, color='k', alpha=0.5)
+      if ii is 1:
+          plt.xlim([-0.005, 0.005]); plt.ylim([-0.005, 0.005])
+      if ii is 2:
+          plt.xlim([-0.0025, 0.0025]); plt.ylim([-0.0025, 0.0025])
+
+      plt.xlabel('β dS/dz * 1e4'); plt.ylabel('α dT/dz * 1e4')
+      plt.title(str(p_ave[ii,0]) + 'm')
+
+  plt.gcf().suptitle('N² < 0 points binned', y=0.75)
+  plt.tight_layout()
+  plt.show()
+#+END_SRC
+
+#+RESULTS:
+[[file:images/rama13-neg-N²-scatter.png]]
+
 
 * RAMA14 (ra-122)
 
@@ -295,7 +572,7 @@ There is no post-cal for temperature.
 #+RESULTS:
 [[file:images/rama14-pre-cal-salinity.png]]
 
-* Full salinity record
+* Full record
 ** What are the differences between end of RAMA13 and start of RAMA14
 
 #+BEGIN_SRC ipython :session :tangle yes :eval never-export :exports results
@@ -387,7 +664,11 @@ The rest seem OK except for the 40m instrument: during recovery/deployment there
 #+RESULTS:
 [[file:images/rama13-rama14-full-salinity.png]]
 
-40m and 60m  instruments seem to be a lot noisier! let's check distribution / variances - variances are only slightly higher.
+40m and 60m  instruments seem to be a lot noisier!
+
+Emily thinks this is because of the thermocline being sloshed up and down by internal waves.
+
+let's check distribution / variances - variances are only slightly higher.
 
 #+BEGIN_SRC ipython :session :tangle yes :eval never-export :exports results :file images/rama13-rama14-sal-histograms.png
   def dcHist(var, bins=100, **kwargs):
@@ -414,112 +695,3 @@ The rest seem OK except for the 40m instrument: during recovery/deployment there
 
 #+RESULTS:
 [[file:images/rama13-rama14-sal-histograms.png]]
-* Density inversions
-** How many exist in 10 minute data
-
-The percentage of valid data that yields N² < 0 at 15m & 30m (chipod depths) are
-#+BEGIN_SRC ipython :session :eval never-export :exports results
-  import seawater as sw
-
-  ra107['salarr'] = np.array([ra107['sal']['10'],
-			      ra107['sal']['20'],
-			      ra107['sal']['40']])
-
-  ra107['temparr'] = np.array([ra107['temp']['10'],
-			       ra107['temp']['20'],
-			       ra107['temp']['40']])
-
-  ra107['presarr'] = np.array([10*np.ones(ra107['temp']['1'].shape),
-			       20*np.ones(ra107['temp']['1'].shape),
-			       40*np.ones(ra107['temp']['1'].shape)])
-
-  N2,_,_ = sw.bfrq(ra107['salarr'], ra107['temparr'], ra107['presarr'], 12)
-  ra107['N2'] = N2
-
-  # Percentage of valid data that yields N² < 0
-  mask0 = ~np.isnan(N2[0,:])
-  mask1 = ~np.isnan(N2[1,:])
-
-  [len(N2[0, N2[0,mask0]<0])/len(N2[0,mask0])*100,
-   len(N2[1, N2[1,mask1]<0])/len(N2[1,mask1])*100]
-#+END_SRC
-
-#+RESULTS:
-| 11.595946682709481 | 21.193434979601815 |
-
-** Where do these occur?
-
-#+BEGIN_SRC ipython :session :tangle yes :eval never-export :exports results :file images/rama13-N2-negative.png
-
-  for index,zz in enumerate(['10', '20', '40']):
-      plt.subplot(3,1,index+1)
-      datenum = mpl.dates.date2num(ra107['date'])
-      plt.plot(datenum, ra107['sal'][zz], 'k-',
-	       linewidth=1)
-      if index == 0:
-          mask = ra107['N2'][0,:] < 0
-
-      if index == 1:
-          mask = np.logical_or(ra107['N2'][0,:] < 0,
-                               ra107['N2'][1,:] < 0)
-
-      if index == 1:
-          mask = ra107['N2'][1,:] < 0
-
-      plt.plot(datenum[mask], ra107['sal'][zz][mask],
-	       'r.', markersize=2)
-
-      # plt.xlim([735260, 735280])
-#+END_SRC
-
-#+RESULTS:
-[[file:images/rama13-N2-negative.png]]
-** Compare with density from .flg file
-
-Using density from .flg files is consistent. There seem be a lot of density inversions between 10m and 20m depths; especially at the beginning of the record.
-
-winter convection?
-
-#+BEGIN_SRC ipython :session :tangle yes :eval never-export :exports results file :file images/rama13-density-diff.png
-  ra107['densarr'] = np.array([ra107['dens']['10'],
-			       ra107['dens']['20'],
-			       ra107['dens']['40']])
-
-  N2 = np.zeros([2, len(ra107['dens']['10'])])
-  N2[0,:] = -9.81/1028 * (ra107['dens']['10']-ra107['dens']['20'])/10
-  N2[1,:] = -9.81/1028 * (ra107['dens']['20']-ra107['dens']['40'])/20
-
-  tend = 500;
-  monthsFmt = mpl.dates.DateFormatter("%d-%m")
-  hax = plt.subplot(211)
-  plt.plot(ra107['date'],
-           ra107['dens-pre']['20'] - ra107['dens-pre']['10'], linewidth=1)
-  plt.axhline(0, color='k')
-  plt.ylabel('Δρ 20m-10m')
-  hax.xaxis.set_major_formatter(monthsFmt)
-
-  plt.subplot(212)
-  plt.plot_date(ra107['date'], ra107['dens-pre']['40'] - ra107['dens-pre']['20'], '-', linewidth=1)
-  plt.axhline(0, color='k')
-  plt.ylabel('Δρ 40m-20m')
-
-
-#+END_SRC
-
-#+RESULTS:
-[[file:images/rama13-density-diff.png]]
-
-#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/rama13-dens-inversion-zoom.png
-  tend = 500;
-  monthsFmt = mpl.dates.DateFormatter("%d-%m")
-
-  plt.plot(ra107['date'][0:tend],
-           ra107['dens-pre']['20'][0:tend] - ra107['dens-pre']['10'][0:tend], linewidth=1)
-  plt.axhline(0, color='k')
-  plt.ylabel('Δρ 20m-10m')
-  hax.xaxis.set_major_formatter(monthsFmt)
-
-#+END_SRC
-
-#+RESULTS:
-[[file:images/rama13-dens-inversion-zoom.png]]
