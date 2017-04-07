@@ -5,7 +5,7 @@
 #+LATEX_CLASS: dcnotebook
 
 #+HTML_HEAD: <link rel="stylesheet" href="notebook.css" type="text/css" />
-* Info emails
+* Info/emails
 ** Quality Codes:
 
   0 = datum missing
@@ -52,7 +52,7 @@ I hope this helps. Take care and please let me know if you need anything else, -
 p.s. The 10m current data will be posted later, - I'll let you know when those are posted as well....
 
 #+END_QUOTE
-* Functions :noexport:
+* Functions           :noexport:
 
 #+BEGIN_SRC ipython :session :tangle yes :eval never-export :exports results
   import numpy as np
@@ -418,7 +418,7 @@ There is no post-cal for temperature.
           proc = '-' + proc
 
       if filt is False:
-          window_len = 1
+          window_len = 2
 
       depths = list(rama[var].keys())
       for index, [d1, d2] in enumerate(zip(depths[0:-3], depths[1:-2])):
@@ -518,7 +518,7 @@ Compare10mDy(ra107, 'sal')
 
 
 #+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/rama13-sal-diff-10m-dy.png
-Compare10mDyDiff(ra107, 'sal', '-post')
+Compare10mDyDiff(ra107, 'sal', '')
 #+END_SRC
 
 #+RESULTS:
@@ -810,7 +810,7 @@ Though most points have dS/dz > 0.
 	       'temp' : rama['temparr'],
 	       'depth' : rama['presarr'][:,0]}
 
-      savemat('RamaPrelimProcessed/' + rama['name'], mdict, do_compression=True)
+      savemat('../RamaPrelimProcessed/' + rama['name'], mdict, do_compression=True)
 
   SaveRama(ra107)
 #+END_SRC
