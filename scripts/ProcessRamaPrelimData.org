@@ -68,7 +68,55 @@ p.s. The 10m current data will be posted later, - I'll let you know when those a
   mpl.rcParams['figure.dpi'] = 180
   mpl.rcParams['axes.facecolor'] = 'None'
 
-  # ra107['sal][ra107['sal'] > 40] = np.NaN
+  def PcolorAll(rama, ylim=None):
+      try:
+          MakeArrays(rama)
+      except:
+          pass
+
+      ax1 = plt.subplot(311)
+      PcolorProperty(rama, 'temp', ylim)
+      ax2 = plt.subplot(312, sharex=ax1)
+      PcolorProperty(rama, 'sal', ylim)
+      ax3 = plt.subplot(313, sharex=ax1)
+      PcolorProperty(rama, 'dens', ylim)
+      plt.tight_layout()
+      plt.show()
+
+  def PcolorProperty(rama, varname, ylim=None):
+      import cmocean as cmo
+      import matplotlib as mpl
+
+      if varname is 'sal':
+          # color = cmo.cm.haline_r
+          color = plt.cm.OrRd
+          clim = [31.5, 35]
+
+      if varname is 'temp':
+          color = cmo.cm.thermal
+          clim = [25, 31]
+
+      if varname is 'dens':
+          color = cmo.cm.dense
+          clim = [1019, 1023]
+
+      sz = rama[varname + 'arr'].shape
+      tindex = np.arange(0, sz[1])
+      datex = np.tile(mpl.dates.date2num(rama['date']), (sz[0], 1))
+      plt.contourf(datex, -rama['presarr'],
+                   np.ma.masked_array(rama[varname + 'arr'],
+                                      np.isnan(rama[varname + 'arr'])),
+                   20, cmap=color)
+      plt.colorbar()
+      xfmt = mpl.dates.DateFormatter('%Y-%m')
+      plt.gca().xaxis.set_major_formatter(xfmt)
+      plt.gcf().autofmt_xdate()
+      plt.clim(clim)
+      plt.title(rama['name'] + ' | ' + varname)
+      plt.axhline(-15, color='w', linewidth=1)
+      plt.axhline(-30, color='w', linewidth=1)
+      if ylim is not None:
+          plt.ylim(ylim)
 
   def smooth(x,window_len=11,window='hanning'):
       """smooth the data using a window with requested size.
@@ -82,25 +130,25 @@ p.s. The 10m current data will be posted later, - I'll let you know when those a
           x: the input signal
           window_len: the dimension of the smoothing window; should be an odd integer
           window: the type of window from 'flat', 'hanning', 'hamming', 'bartlett', 'blackman'
-              flat window will produce a moving average smoothing.
+          flat window will produce a moving average smoothing.
 
       output:
-          the smoothed signal
+                  the smoothed signal
 
       example:
 
       t=linspace(-2,2,0.1)
-      x=sin(t)+randn(len(t))*0.1
-      y=smooth(x)
+                  x=sin(t)+randn(len(t))*0.1
+                  y=smooth(x)
 
       see also:
 
       numpy.hanning, numpy.hamming, numpy.bartlett, numpy.blackman, numpy.convolve
-      scipy.signal.lfilter
+                  scipy.signal.lfilter
 
       TODO: the window parameter could be the window itself if an array instead of a string
-      NOTE: length(output) != length(input), to correct this: return y[(window_len/2-1):-(window_len/2)] instead of just y.
-      """
+                  NOTE: length(output) != length(input), to correct this: return y[(window_len/2-1):-(window_len/2)] instead of just y.
+                  """
 
       if x.ndim != 1:
           raise ValueError("smooth only accepts 1 dimension arrays.")
@@ -128,32 +176,32 @@ p.s. The 10m current data will be posted later, - I'll let you know when those a
 
 
   def CleanSalinity(salinity):
-    """ Adds NaNs in place of missing values. """
-    import numpy as np
+      """ Adds NaNs in place of missing values. """
+      import numpy as np
 
-    salinity = np.float32(salinity)
+      salinity = np.float32(salinity)
 
-    if salinity > 39:
-      salinity = np.nan
+      if salinity > 39:
+          salinity = np.nan
 
-    return salinity
+      return salinity
 
   def ProcessDate(datestr):
-    """ Takes in string of form YYYYydayHHMM and returns python datetime object."""
-    import datetime as dt
+      """ Takes in string of form YYYYydayHHMM and returns python datetime object."""
+      import datetime as dt
 
-    year = int(datestr[0:4])
-    yday = int(datestr[4:7])
-    hour = int(datestr[7:9])
-    mins = int(datestr[9:11])
+      year = int(datestr[0:4])
+      yday = int(datestr[4:7])
+      hour = int(datestr[7:9])
+      mins = int(datestr[9:11])
 
-    date = dt.datetime(year=year, month=1, day=1) \
-			     +  dt.timedelta(days=yday-1, hours=hour, minutes=mins)
+      date = dt.datetime(year=year, month=1, day=1) \
+                               + dt.timedelta(days=yday-1, hours=hour, minutes=mins)
 
-    return date
+      return date
 
   sal = np.dtype([('date', dt.datetime),
-		  ('sal', [('1', np.float32),
+                  ('sal', [('1', np.float32),
                            ('10', np.float32),
                            ('20', np.float32),
                            ('40', np.float32),
@@ -176,18 +224,18 @@ p.s. The 10m current data will be posted later, - I'll let you know when those a
                              ('180', np.float32),
                              ('300', np.float32),
                              ('500', np.float32)]),
-		   ('QQQQQQ', np.uint32),
-		   ('SSSSSS', np.uint32)])
+                   ('QQQQQQ', np.uint32),
+                   ('SSSSSS', np.uint32)])
 
   dens = np.dtype([('date', dt.datetime),
-		   ('dens', [('1', np.float32),
-                            ('10', np.float32),
+                   ('dens', [('1', np.float32),
+                             ('10', np.float32),
                             ('20', np.float32),
                             ('40', np.float32),
                             ('60', np.float32),
                             ('100', np.float32)]),
-		   ('QQQQQQ', np.uint32),
-		   ('SSSSSS', np.uint32)])
+                   ('QQQQQQ', np.uint32),
+                   ('SSSSSS', np.uint32)])
 
   def Compare10mDyDiff(rama, var, proc='', filt=False, window_len=13):
       ''' Compares 10m and daily differences of quantities '''
@@ -229,7 +277,7 @@ p.s. The 10m current data will be posted later, - I'll let you know when those a
 
           plt.gcf().suptitle(proc)
 
-      plt.show()
+          plt.show()
 
   def Compare10mDy(rama, var, proc=''):
       ''' Plots 10min and daily timeseries of var'''
@@ -283,7 +331,7 @@ p.s. The 10m current data will be posted later, - I'll let you know when those a
       t0 = dt.datetime.strptime(salfile['time'].units[11:],
 				'%Y-%m-%d %H:%M:%S')
       timevec = np.array([t0 + dt.timedelta(days=tt.astype('float')) \
-			  for tt in salfile['time'][0:]])
+                          for tt in salfile['time'][0:]])
 
       indstart = np.argmin(np.abs(timevec - rama['date'][0]))
       indstop = np.argmin(np.abs(timevec - rama['date'][-1]))
@@ -305,10 +353,10 @@ p.s. The 10m current data will be posted later, - I'll let you know when those a
           rama['sal-dy'][str(zz)] = sal_matrix[:,index]
           rama['temp-dy'][str(zz)] = temp_matrix[:,tindex[index]]
           rama['dens-dy'][str(zz)] = dens_matrix[:,index]
-
 #+END_SRC
 
 #+RESULTS:
+
 * RAMA13 (ra-107)
 ** Read data
 From Sonya:
@@ -380,9 +428,236 @@ From Sonya:
   ra107['hr-time'] = ra107['date'][0::window_len/2]
 
   ReadDailyData(ra107)
+
+  def MakeArrays(rama, proc=''):
+      rama['salarr'] = np.array([rama['sal' + proc]['1'],
+			          rama['sal' + proc]['10'],
+			          rama['sal' + proc]['20'],
+			          rama['sal' + proc]['40'],
+			          rama['sal' + proc]['60'],
+			          rama['sal' + proc]['100']])
+
+      rama['temparr'] = np.array([rama['temp' + proc]['1'],
+			           rama['temp' + proc]['10'],
+			           rama['temp' + proc]['20'],
+			           rama['temp' + proc]['40'],
+			           rama['temp' + proc]['60'],
+			           rama['temp' + proc]['100']])
+
+      rama['densarr'] = np.array([rama['dens' + proc]['1'],
+			           rama['dens' + proc]['10'],
+			           rama['dens' + proc]['20'],
+			           rama['dens' + proc]['40'],
+			           rama['dens' + proc]['60'],
+			           rama['dens' + proc]['100']])
+
+      rama['presarr'] = np.array([1*np.ones(rama['salarr'][0,:].shape),
+			           10*np.ones(rama['salarr'][0,:].shape),
+			           20*np.ones(rama['salarr'][0,:].shape),
+			           40*np.ones(rama['salarr'][0,:].shape),
+			           60*np.ones(rama['salarr'][0,:].shape),
+			           100*np.ones(rama['salarr'][0,:].shape)])
+      return rama
+
+
 #+END_SRC
 
 #+RESULTS:
+
+** Property plots
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/rama13-T-S-ρ.png
+  PcolorAll(ra107, ylim=[-50, 0])
+#+END_SRC
+
+#+RESULTS:
+[[file:images/rama13-T-S-ρ.png]]
+** Density inversions
+*** How many exist in /10 minute/ data
+The percentage of valid data with N² < 0
+#+BEGIN_SRC ipython :session :eval never-export :exports results
+  def TabulateNegativeN2(p_ave, N2, dSdz, dTdz):
+      ''' Percentage of valid data that yields N² < 0 '''
+      table = [list(p_ave[:,0]),
+	       [np.round(len(n[n<0])/len(n)*100) for n in # % N² < 0
+		[N2[i,~np.isnan(N2[i,:])] for i in range(N2.shape[0])]],
+	       [np.round(len(s[s>0])/len(s)*100) for s in # % dS/dz > 0
+		[dSdz[i,~np.isnan(dSdz[i,:])] for i in range(dSdz.shape[0])]],
+	       [np.round(len(s[s<0])/len(s)*100) for s in # % dT/dz > 0
+		[dTdz[i,~np.isnan(dTdz[i,:])] for i in range(dTdz.shape[0])]]]
+
+      table[0].insert(0, 'Depth (m)')
+      table[1].insert(0, '% N² < 0')
+      table[2].insert(0, '% dS/dz > 0')
+      table[3].insert(0, '% dT/dz < 0')
+
+      return table
+
+  def CalcGradients(rama):
+      dSdz = -np.diff(rama['salarr'], axis=0)/np.diff(rama['presarr'], axis=0)
+      dTdz = -np.diff(rama['temparr'], axis=0)/np.diff(rama['presarr'], axis=0)
+
+      N2,_,p_ave = sw.bfrq(rama['salarr'], rama['temparr'], rama['presarr'], 12)
+      rama['N2'] = N2
+      return (dSdz, dTdz, N2, p_ave)
+
+  MakeArrays(ra107)
+  dSdz, dTdz, N2, p_ave = CalcGradients(ra107)
+  table = TabulateNegativeN2(p_ave, N2, dSdz, dTdz)
+  table
+#+END_SRC
+
+#+RESULTS:
+| Depth (m)   |  5.5 | 15.0 | 30.0 | 50.0 | 80.0 |
+| % N² < 0    | 61.0 | 12.0 | 21.0 |  0.0 |  0.0 |
+| % dS/dz > 0 | 53.0 | 19.0 | 28.0 |  1.0 | 15.0 |
+| % dT/dz < 0 | 69.0 | 47.0 | 23.0 |  7.0 |  0.0 |
+*** How many exist in /filtered hourly/ data
+  #+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export
+    MakeArrays(ra107, '-hr')
+    dSdz, dTdz, N2, p_ave = CalcGradients(ra107)
+    table = TabulateNegativeN2(p_ave, N2, dSdz, dTdz)
+    table
+  #+END_SRC
+
+  #+RESULTS:
+  | Depth (m)   |  5.5 | 15.0 | 30.0 | 50.0 | 80.0 |
+  | % N² < 0    | 61.0 | 12.0 | 20.0 |  0.0 |  0.0 |
+  | % dS/dz > 0 | 54.0 | 19.0 | 27.0 |  1.0 | 15.0 |
+  | % dT/dz < 0 | 69.0 | 48.0 | 22.0 |  7.0 |  0.0 |
+
+*** Where do these occur?
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/rama13-dens-inversion-zoom.png
+  tend = 500;
+  monthsFmt = mpl.dates.DateFormatter("%d-%m")
+
+  plt.plot(ra107['date'][0:tend],
+           ra107['dens']['20'][0:tend] - ra107['dens']['10'][0:tend], linewidth=1)
+  plt.axhline(0, color='k')
+  plt.ylabel('Δρ 20m-10m')
+  hax.xaxis.set_major_formatter(monthsFmt)
+
+#+END_SRC
+
+#+RESULTS:
+[[file:images/rama13-dens-inversion-zoom.png]]
+
+*** Funny density offset/trends appear to result from salinity.
+
+#+BEGIN_SRC ipython :session :tangle yes :eval never-export :exports results :file images/rama13-sal-diff.png
+  N2 = np.zeros([2, len(ra107['sal']['10'])])
+  N2[0,:] = -9.81/1028 * (ra107['sal']['10']-ra107['sal']['20'])/10
+  N2[1,:] = -9.81/1028 * (ra107['sal']['20']-ra107['sal']['40'])/20
+
+  limy = [-0.2, 0.4]
+
+  tend = 500;
+  monthsFmt = mpl.dates.DateFormatter("%d-%m")
+
+  depths = list(ra107['sal'].keys())
+  for index, [d1, d2] in enumerate(zip(depths[0:-3], depths[1:-2])):
+      hax = plt.subplot(3,1,index+1)
+      plt.plot(ra107['date'],
+               ra107['sal'][d2] - ra107['sal'][d1], linewidth=1)
+      plt.plot(ra107['dy-time'],
+               ra107['sal-dy'][d2] - ra107['sal-dy'][d1], linewidth=1)
+      plt.axhline(0, color='k')
+      plt.ylabel('ΔS ' + d2 + 'm-' + d1 + 'm')
+      plt.ylim(limy)
+      hax.xaxis.set_major_formatter(monthsFmt)
+
+  plt.show()
+#+END_SRC
+
+#+RESULTS:
+[[file:images/rama13-sal-diff.png]]
+*** Contributors to negative N²
+Salinity appears to be the controlling factor generally.
+
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/rama13-dρdz.png
+
+  class MidpointNormalize(mpl.colors.Normalize):
+      def __init__(self, vmin=None, vmax=None, midpoint=None, clip=False):
+          self.midpoint = midpoint
+          mpl.colors.Normalize.__init__(self, vmin, vmax, clip)
+
+      def __call__(self, value, clip=None):
+          # I'm ignoring masked values and all kinds of edge cases to make a
+          # simple example...
+          x, y = [self.vmin, self.midpoint, self.vmax], [0, 0.5, 1]
+          return np.ma.masked_array(np.interp(value, x, y))
+
+  tindex = np.arange(0,dSdz.shape[1])
+  # ra107['N2'][ra107['N2'] > 0.05] = np.nan;
+
+  hax = plt.subplot(311)
+  plt.pcolormesh(tindex, -ra107['presarr'],
+		 1e6*-7.6e-5*np.ma.masked_array(dSdz, np.isnan(dSdz)),
+		 norm=MidpointNormalize(midpoint=0.),
+		 cmap=cmo.cm.balance)
+  plt.title('β dS/dz * 1e6')
+  plt.clim(-3, 12)
+  plt.colorbar(extend='min')
+
+  hax = plt.subplot(312)
+  plt.pcolormesh(tindex, -ra107['presarr'],
+		 1e6*-1.7e-4*np.ma.masked_array(dTdz, np.isnan(dTdz)),
+		 norm=MidpointNormalize(midpoint=0.),
+		 cmap=cmo.cm.balance)
+  plt.colorbar(extend='min')
+  plt.clim(-3, 12)
+  plt.title('-α dT/dz * 1e6')
+
+  hax = plt.subplot(313)
+  mycmap = copy(cmo.cm.ice_r)
+  mycmap.set_bad(color='w')
+  mycmap.set_under(color='r')
+  mynorm = mpl.colors.Normalize(vmin=0., vmax=np.nanmax(ra107['N2']))
+
+  plt.pcolormesh(tindex, -ra107['presarr'],
+		 np.ma.masked_array(ra107['N2'], np.isnan(ra107['N2'])),
+		 cmap=mycmap, norm=mynorm)
+  plt.axhline(-15, color='k'); plt.axhline(-30, color='k')
+  plt.colorbar(extend='min')
+  plt.title('N² (negative in red)')
+
+  plt.tight_layout()
+  plt.show()
+
+#+END_SRC
+
+#+RESULTS:
+[[file:images/rama13-dρdz.png]]
+
+Let's try a better way.
+
+Looks like both dT/dz < 0, dS/dz > 0 (colder, saltier water on top) are responsible.
+
+Though most points have dS/dz > 0.
+
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/rama13-neg-N²-scatter.png
+
+  for ii in [1,2]:
+      plt.subplot(1,2,ii)
+      mask = N2[ii,:] < 0
+      plt.hexbin(7.6e-1*dSdz[ii,mask], 1.7*dTdz[ii,mask], mincnt=10)
+      plt.axis('square')
+      plt.axhline(0, color='k', alpha=0.5);
+      plt.axvline(0, color='k', alpha=0.5)
+      if ii is 1:
+          plt.xlim([-0.005, 0.005]); plt.ylim([-0.005, 0.005])
+      if ii is 2:
+          plt.xlim([-0.0025, 0.0025]); plt.ylim([-0.0025, 0.0025])
+
+      plt.xlabel('β dS/dz * 1e4'); plt.ylabel('α dT/dz * 1e4')
+      plt.title(str(p_ave[ii,0]) + 'm')
+
+  plt.gcf().suptitle('N² < 0 points binned', y=0.75)
+  plt.tight_layout()
+  plt.show()
+#+END_SRC
+
+#+RESULTS:
+[[file:images/rama13-neg-N²-scatter.png]]
 
 ** Salinity
 *** Difference: pre- and post-salinity 10m, 20m.
@@ -567,224 +842,6 @@ Compare10mDyDiff(ra107, 'dens', '', filt=True, window_len=13)
 
 #+RESULTS:
 [[file:images/rama13-dens-diff-10m-dy.png]]
-
-** Density inversions
-*** How many exist in /10 minute/ data
-The percentage of valid data with N² < 0
-#+BEGIN_SRC ipython :session :eval never-export :exports results
-  def TabulateNegativeN2(p_ave, N2, dSdz, dTdz):
-      ''' Percentage of valid data that yields N² < 0 '''
-      table = [list(p_ave[:,0]),
-	       [np.round(len(n[n<0])/len(n)*100) for n in # % N² < 0
-		[N2[i,~np.isnan(N2[i,:])] for i in range(N2.shape[0])]],
-	       [np.round(len(s[s>0])/len(s)*100) for s in # % dS/dz > 0
-		[dSdz[i,~np.isnan(dSdz[i,:])] for i in range(dSdz.shape[0])]],
-	       [np.round(len(s[s<0])/len(s)*100) for s in # % dT/dz > 0
-		[dTdz[i,~np.isnan(dTdz[i,:])] for i in range(dTdz.shape[0])]]]
-
-      table[0].insert(0, 'Depth (m)')
-      table[1].insert(0, '% N² < 0')
-      table[2].insert(0, '% dS/dz > 0')
-      table[3].insert(0, '% dT/dz < 0')
-
-      return table
-
-  def MakeArrays(rama, proc=''):
-      rama['salarr'] = np.array([rama['sal' + proc]['1'],
-			          rama['sal' + proc]['10'],
-			          rama['sal' + proc]['20'],
-			          rama['sal' + proc]['40'],
-			          rama['sal' + proc]['60'],
-			          rama['sal' + proc]['100']])
-
-      rama['temparr'] = np.array([rama['temp' + proc]['1'],
-			           rama['temp' + proc]['10'],
-			           rama['temp' + proc]['20'],
-			           rama['temp' + proc]['40'],
-			           rama['temp' + proc]['60'],
-			           rama['temp' + proc]['100']])
-
-      rama['densarr'] = np.array([rama['dens' + proc]['1'],
-			           rama['dens' + proc]['10'],
-			           rama['dens' + proc]['20'],
-			           rama['dens' + proc]['40'],
-			           rama['dens' + proc]['60'],
-			           rama['dens' + proc]['100']])
-
-      rama['presarr'] = np.array([1*np.ones(rama['salarr'][0,:].shape),
-			           10*np.ones(rama['salarr'][0,:].shape),
-			           20*np.ones(rama['salarr'][0,:].shape),
-			           40*np.ones(rama['salarr'][0,:].shape),
-			           60*np.ones(rama['salarr'][0,:].shape),
-			           100*np.ones(rama['salarr'][0,:].shape)])
-      return rama
-
-  def CalcGradients(rama):
-      dSdz = -np.diff(rama['salarr'], axis=0)/np.diff(rama['presarr'], axis=0)
-      dTdz = -np.diff(rama['temparr'], axis=0)/np.diff(rama['presarr'], axis=0)
-
-      N2,_,p_ave = sw.bfrq(rama['salarr'], rama['temparr'], rama['presarr'], 12)
-      rama['N2'] = N2
-      return (dSdz, dTdz, N2, p_ave)
-
-  MakeArrays(ra107)
-  dSdz, dTdz, N2, p_ave = CalcGradients(ra107)
-  table = TabulateNegativeN2(p_ave, N2, dSdz, dTdz)
-  table
-#+END_SRC
-
-#+RESULTS:
-| Depth (m)   |  5.5 | 15.0 | 30.0 | 50.0 | 80.0 |
-| % N² < 0    | 61.0 | 12.0 | 21.0 |  0.0 |  0.0 |
-| % dS/dz > 0 | 53.0 | 19.0 | 28.0 |  1.0 | 15.0 |
-| % dT/dz < 0 | 69.0 | 47.0 | 23.0 |  7.0 |  0.0 |
-*** How many exist in /filtered hourly/ data
-  #+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export
-    MakeArrays(ra107, '-hr')
-    dSdz, dTdz, N2, p_ave = CalcGradients(ra107)
-    table = TabulateNegativeN2(p_ave, N2, dSdz, dTdz)
-    table
-  #+END_SRC
-
-  #+RESULTS:
-  | Depth (m)   |  5.5 | 15.0 | 30.0 | 50.0 | 80.0 |
-  | % N² < 0    | 61.0 | 12.0 | 20.0 |  0.0 |  0.0 |
-  | % dS/dz > 0 | 54.0 | 19.0 | 27.0 |  1.0 | 15.0 |
-  | % dT/dz < 0 | 69.0 | 48.0 | 22.0 |  7.0 |  0.0 |
-
-*** Where do these occur?
-#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/rama13-dens-inversion-zoom.png
-  tend = 500;
-  monthsFmt = mpl.dates.DateFormatter("%d-%m")
-
-  plt.plot(ra107['date'][0:tend],
-           ra107['dens']['20'][0:tend] - ra107['dens']['10'][0:tend], linewidth=1)
-  plt.axhline(0, color='k')
-  plt.ylabel('Δρ 20m-10m')
-  hax.xaxis.set_major_formatter(monthsFmt)
-
-#+END_SRC
-
-#+RESULTS:
-[[file:images/rama13-dens-inversion-zoom.png]]
-
-*** Funny density offset/trends appear to result from salinity.
-
-#+BEGIN_SRC ipython :session :tangle yes :eval never-export :exports results :file images/rama13-sal-diff.png
-  N2 = np.zeros([2, len(ra107['sal']['10'])])
-  N2[0,:] = -9.81/1028 * (ra107['sal']['10']-ra107['sal']['20'])/10
-  N2[1,:] = -9.81/1028 * (ra107['sal']['20']-ra107['sal']['40'])/20
-
-  limy = [-0.2, 0.4]
-
-  tend = 500;
-  monthsFmt = mpl.dates.DateFormatter("%d-%m")
-
-  depths = list(ra107['sal'].keys())
-  for index, [d1, d2] in enumerate(zip(depths[0:-3], depths[1:-2])):
-      hax = plt.subplot(3,1,index+1)
-      plt.plot(ra107['date'],
-               ra107['sal'][d2] - ra107['sal'][d1], linewidth=1)
-      plt.plot(ra107['dy-time'],
-               ra107['sal-dy'][d2] - ra107['sal-dy'][d1], linewidth=1)
-      plt.axhline(0, color='k')
-      plt.ylabel('ΔS ' + d2 + 'm-' + d1 + 'm')
-      plt.ylim(limy)
-      hax.xaxis.set_major_formatter(monthsFmt)
-
-  plt.show()
-#+END_SRC
-
-#+RESULTS:
-[[file:images/rama13-sal-diff.png]]
-*** Contributors to negative N²
-Salinity appears to be the controlling factor generally.
-
-#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/rama13-dρdz.png
-
-  class MidpointNormalize(mpl.colors.Normalize):
-      def __init__(self, vmin=None, vmax=None, midpoint=None, clip=False):
-          self.midpoint = midpoint
-          mpl.colors.Normalize.__init__(self, vmin, vmax, clip)
-
-      def __call__(self, value, clip=None):
-          # I'm ignoring masked values and all kinds of edge cases to make a
-          # simple example...
-          x, y = [self.vmin, self.midpoint, self.vmax], [0, 0.5, 1]
-          return np.ma.masked_array(np.interp(value, x, y))
-
-  tindex = np.arange(0,dSdz.shape[1])
-  # ra107['N2'][ra107['N2'] > 0.05] = np.nan;
-
-  hax = plt.subplot(311)
-  plt.pcolormesh(tindex, -ra107['presarr'],
-		 1e6*-7.6e-5*np.ma.masked_array(dSdz, np.isnan(dSdz)),
-		 norm=MidpointNormalize(midpoint=0.),
-		 cmap=cmo.cm.balance)
-  plt.title('β dS/dz * 1e6')
-  plt.clim(-3, 12)
-  plt.colorbar(extend='min')
-
-  hax = plt.subplot(312)
-  plt.pcolormesh(tindex, -ra107['presarr'],
-		 1e6*-1.7e-4*np.ma.masked_array(dTdz, np.isnan(dTdz)),
-		 norm=MidpointNormalize(midpoint=0.),
-		 cmap=cmo.cm.balance)
-  plt.colorbar(extend='min')
-  plt.clim(-3, 12)
-  plt.title('-α dT/dz * 1e6')
-
-  hax = plt.subplot(313)
-  mycmap = copy(cmo.cm.ice_r)
-  mycmap.set_bad(color='w')
-  mycmap.set_under(color='r')
-  mynorm = mpl.colors.Normalize(vmin=0., vmax=np.nanmax(ra107['N2']))
-
-  plt.pcolormesh(tindex, -ra107['presarr'],
-		 np.ma.masked_array(ra107['N2'], np.isnan(ra107['N2'])),
-		 cmap=mycmap, norm=mynorm)
-  plt.axhline(-15, color='k'); plt.axhline(-30, color='k')
-  plt.colorbar(extend='min')
-  plt.title('N² (negative in red)')
-
-  plt.tight_layout()
-  plt.show()
-
-#+END_SRC
-
-#+RESULTS:
-[[file:images/rama13-dρdz.png]]
-
-Let's try a better way.
-
-Looks like both dT/dz < 0, dS/dz > 0 (colder, saltier water on top) are responsible.
-
-Though most points have dS/dz > 0.
-
-#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/rama13-neg-N²-scatter.png
-
-  for ii in [1,2]:
-      plt.subplot(1,2,ii)
-      mask = N2[ii,:] < 0
-      plt.hexbin(7.6e-1*dSdz[ii,mask], 1.7*dTdz[ii,mask], mincnt=10)
-      plt.axis('square')
-      plt.axhline(0, color='k', alpha=0.5);
-      plt.axvline(0, color='k', alpha=0.5)
-      if ii is 1:
-          plt.xlim([-0.005, 0.005]); plt.ylim([-0.005, 0.005])
-      if ii is 2:
-          plt.xlim([-0.0025, 0.0025]); plt.ylim([-0.0025, 0.0025])
-
-      plt.xlabel('β dS/dz * 1e4'); plt.ylabel('α dT/dz * 1e4')
-      plt.title(str(p_ave[ii,0]) + 'm')
-
-  plt.gcf().suptitle('N² < 0 points binned', y=0.75)
-  plt.tight_layout()
-  plt.show()
-#+END_SRC
-
-#+RESULTS:
-[[file:images/rama13-neg-N²-scatter.png]]
 ** Save data
 
 #+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export
@@ -824,9 +881,8 @@ Though most points have dS/dz > 0.
 #+END_SRC
 
 #+RESULTS:
-
 * RAMA14 (ra-122)
-
+** Read data
 #+BEGIN_SRC ipython :session :tangle yes :eval never-export :exports results
   ra122read = np.loadtxt('../TAO_raw/sal122a.flg', skiprows=5, dtype=sal,
 			 converters={0:ProcessDate,
@@ -839,6 +895,7 @@ Though most points have dS/dz > 0.
 
   ra122 = dict([])
   ra122['date'] = ra122read['date']
+  ra122['name'] = 'RAMA14'
 
   ra122['sal'] = dict([])
   for depth in ra122read['sal'].dtype.names:
@@ -868,14 +925,22 @@ Though most points have dS/dz > 0.
 			             6:CleanSalinity})
   ra122[var] = dict([])
   for depth in ra122read[var].dtype.names:
-      ra122[var][depth] = ra122read[var][depth]
+      ra122[var][depth] = ra122read[var][depth] + 1000
 
 
   ReadDailyData(ra122)
 #+END_SRC
 
 #+RESULTS:
+** Property plots
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/rama14-T-S-ρ.png
+  PcolorAll(ra122, ylim=[-50, 0])
+#+END_SRC
 
+#+RESULTS:
+[[file:images/rama14-T-S-ρ.png]]
+
+** Salinity
 #+BEGIN_SRC ipython :session :tangle yes :eval never-export :exports results :file images/rama14-pre-cal-salinity.png
     plt.figure()
 
@@ -891,7 +956,6 @@ Though most points have dS/dz > 0.
 #+RESULTS:
 [[file:images/rama14-pre-cal-salinity.png]]
 
-** Salinity
 #+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/RAMA14-sal-diff.png
 Compare10mDyDiff(ra122, 'sal', '')
 #+END_SRC
@@ -908,6 +972,77 @@ Compare10mDyDiff(ra122, 'dens', '')
 [[file:images/RAMA14-dens-diff.png]]
 
 * Full record
+** Property plots
+
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/rama1314-T-s-ρ.png
+  def RamaStitch(ra1, ra2):
+
+      rama = dict()
+      rama['name'] = 'RAMA 13,14'
+      rama['date'] = np.concatenate((ra1['date'], ra2['date']), axis=0)
+      for pp in ['densarr', 'salarr', 'temparr', 'presarr']:
+          rama[pp] = np.concatenate((ra1[pp],ra2[pp]), axis=1)
+
+      return rama
+
+  ramafull = RamaStitch(ra107, ra122)
+  PcolorAll(ramafull, ylim=[-50,0])
+#+END_SRC
+
+#+RESULTS:
+[[file:images/rama1314-T-s-ρ.png]]
+
+** Scatter TS
+
+TS scatter plots change dramatically between 2014 and 2015.
+
+Dots are scattered between 1-Jan-2014/2015 to 31-Dec-2014/2015
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/rama1314-TS.png
+
+  def ScatterTS(rama, depth, tlim=None):
+      import cmocean as cmo
+      T = rama['temp-dy'][depth][:]
+      S = rama['sal-dy'][depth][:]
+      t = mpl.dates.date2num(rama['dy-time'][:])
+
+      if tlim is not None:
+          trange = np.where(np.logical_and(t >= tlim[0], t <= tlim[1]))
+      else:
+          trange = np.arange(0, len(S))
+
+      plt.scatter(S[trange], T[trange], s=30, c=t[trange],
+                  alpha=0.65, linewidth=0.15, edgecolor='gray',
+                  cmap=cmo.cm.matter)
+      fmt = mpl.dates.DateFormatter('%Y-%m')
+      # plt.colorbar(format=fmt)
+      if tlim is not None:
+          plt.clim(tlim)
+      plt.title(rama['name'] + ' | ' + depth + ' m')
+      plt.xlabel('S'); plt.ylabel('T');
+
+  tlim = mpl.dates.date2num([dt.datetime(2014, 1, 1),
+                             dt.datetime(2014, 12, 31)]);
+  # tlim = None
+  ax1 = plt.subplot(221)
+  ScatterTS(ra107, '10', tlim=tlim)
+  ax2 = plt.subplot(223, sharex=ax1, sharey=ax1)
+  ScatterTS(ra107, '20', tlim=tlim)
+  plt.tight_layout()
+
+  tlim = mpl.dates.date2num([dt.datetime(2015, 1, 1),
+                             dt.datetime(2015, 12, 31)]);
+  # tlim=None
+  ax3 = plt.subplot(222, sharex=ax1, sharey=ax1)
+  ScatterTS(ra122, '10', tlim=tlim)
+  ax4 = plt.subplot(224, sharex=ax1, sharey=ax1)
+  ScatterTS(ra122, '20', tlim=tlim)
+  plt.tight_layout()
+  plt.show()
+#+END_SRC
+
+#+RESULTS:
+[[file:images/rama1314-TS.png]]
+
 ** What are the differences between end of RAMA13 and start of RAMA14
 
 #+BEGIN_SRC ipython :session :tangle yes :eval never-export :exports results
