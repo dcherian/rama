@@ -188,10 +188,127 @@ p.s. The 10m current data will be posted later, - I'll let you know when those a
                             ('100', np.float32)]),
 		   ('QQQQQQ', np.uint32),
 		   ('SSSSSS', np.uint32)])
+
+  def Compare10mDyDiff(rama, var, proc='', filt=False, window_len=13):
+      ''' Compares 10m and daily differences of quantities '''
+      import matplotlib as mpl
+      monthsFmt = mpl.dates.DateFormatter("%d-%m")
+
+      if var is 'sal':
+          label = 'S'
+
+      if var is 'temp':
+          label = 'T'
+
+      if var is 'dens':
+          label = 'ρ'
+
+      if proc is not '' and proc[0] is not '-':
+          proc = '-' + proc
+
+      if filt is False:
+          window_len = 2
+
+      depths = list(rama[var].keys())
+      for index, [d1, d2] in enumerate(zip(depths[0:-3], depths[1:-2])):
+          hax = plt.subplot(3,1,index+1)
+          dens1 = smooth(rama[var + proc][d1], window_len=window_len)
+          dens2 = smooth(rama[var + proc][d2], window_len=window_len)
+          plt.plot(rama['date'][0::window_len/2],
+                   dens2[0::window_len/2]-dens1[0::window_len/2], linewidth=1)
+          plt.plot(rama['dy-time'],
+                   rama[var + '-dy'][d2] - rama[var + '-dy'][d1], linewidth=1)
+          plt.axhline(0, color='k')
+          if var is 'sal':
+              plt.axhline(0.06, color='gray')
+              plt.axhline(-0.06, color='gray')
+
+          plt.ylim([-0.1, 0.4])
+          plt.ylabel('Δ' + label + ' ' + d2 + 'm-' + d1 + 'm')
+          hax.xaxis.set_major_formatter(monthsFmt)
+
+          plt.gcf().suptitle(proc)
+
+      plt.show()
+
+  def Compare10mDy(rama, var, proc=''):
+      ''' Plots 10min and daily timeseries of var'''
+      if var is 'sal':
+          label = 'S'
+
+      if var is 'temp':
+          label = 'T'
+
+      if var is 'dens':
+          label = 'ρ'
+
+      if proc is not '' and proc[0] is not '-':
+          proc = '-' + proc
+
+      for index,zz in enumerate(['1', '10', '20', '40']):
+          plt.subplot(4,1,index+1)
+          datenum = mpl.dates.date2num(ra107['date'])
+          plt.plot(datenum, ra107[var + proc][zz], linewidth=1)
+          plt.ylabel(label + ' ' + zz + 'm')
+          plt.plot(ra107['dy-time'], ra107[var + '-dy'][zz], linewidth=1)
+
+          # if index == 0:
+          #     mask = ra107['N2'][0,:] < 0
+
+          # if index == 1:
+          #     mask = np.logical_or(ra107['N2'][0,:] < 0,
+          #                          ra107['N2'][1,:] < 0)
+
+          # if index == 1:
+          #     mask = ra107['N2'][1,:] < 0
+
+          # plt.plot(datenum[mask], ra107[var][zz][mask],
+          # 'r.', markersize=2)
+
+          # plt.xlim([735260, 735280])
+
+          plt.gcf().suptitle(proc)
+
+      plt.show()
+
+  # read netCDF data
+  def ReadDailyData(rama, salfilename='../s12n90e_dy.cdf',
+                    tempfilename='../t12n90e_dy.cdf'):
+      import netCDF4 as nc
+
+      salfile = nc.Dataset(salfilename)
+      tempfile = nc.Dataset(tempfilename)
+
+      # t0 = np.datetime64(salfile['time'].units[14:])
+      t0 = dt.datetime.strptime(salfile['time'].units[11:],
+				'%Y-%m-%d %H:%M:%S')
+      timevec = np.array([t0 + dt.timedelta(days=tt.astype('float')) \
+			  for tt in salfile['time'][0:]])
+
+      indstart = np.argmin(np.abs(timevec - rama['date'][0]))
+      indstop = np.argmin(np.abs(timevec - rama['date'][-1]))
+
+      tindex = [np.where(tempfile['depth'][:] == zz)[0][0] for zz in salfile['depth'][:]]
+      temp_matrix = tempfile['T_20'][indstart:indstop+1].squeeze()
+      temp_matrix[temp_matrix > 40] = np.nan
+      sal_matrix = salfile['S_41'][indstart:indstop+1].squeeze()
+      sal_matrix[sal_matrix > 40] = np.nan
+
+      dens_matrix = sw.pden(sal_matrix, temp_matrix[:,tindex], salfile['depth'][:])
+      # save processed salinity product
+      rama['sal-dy'] = dict([])
+      rama['temp-dy'] = dict([])
+      rama['dens-dy'] = dict([])
+      rama['dy-time'] = timevec[indstart:indstop+1]
+
+      for index, zz in enumerate(np.int32(salfile['depth'][:])):
+          rama['sal-dy'][str(zz)] = sal_matrix[:,index]
+          rama['temp-dy'][str(zz)] = temp_matrix[:,tindex[index]]
+          rama['dens-dy'][str(zz)] = dens_matrix[:,index]
+
 #+END_SRC
 
 #+RESULTS:
-
 * RAMA13 (ra-107)
 ** Read data
 From Sonya:
@@ -204,7 +321,6 @@ From Sonya:
   # setup a mooring dictionary
   ra107 = dict([])
   ra107['name'] = 'RAMA13'
-  ra107['date'] = ra107pre['date']
   ra107['sal']  = dict([])
   ra107['temp'] = dict([])
   ra107['dens'] = dict([])
@@ -219,6 +335,7 @@ From Sonya:
   ra107pre = np.loadtxt('../TAO_raw/sal107a.flg', skiprows=5, dtype=sal,
 			converters=cnv)
   ra107['sal-pre'] = ra107pre['sal']
+  ra107['date'] = ra107pre['date']
   ra107post = np.loadtxt('../TAO_raw/postcal/sal107a.flg', skiprows=5,
 			 dtype=sal, converters=cnv)
   ra107['sal-post'] = ra107post['sal']
@@ -262,55 +379,29 @@ From Sonya:
 
   ra107['hr-time'] = ra107['date'][0::window_len/2]
 
-  # read netCDF data
-  salfilename='../s12n90e_dy.cdf'
-  tempfilename='../t12n90e_dy.cdf'
-
-  import netCDF4 as nc
-
-  salfile = nc.Dataset(salfilename)
-  tempfile = nc.Dataset(tempfilename)
-
-  # t0 = np.datetime64(salfile['time'].units[14:])
-  t0 = dt.datetime.strptime(salfile['time'].units[11:],
-			    '%Y-%m-%d %H:%M:%S')
-  timevec = np.array([t0 + dt.timedelta(days=tt.astype('float')) \
-			for tt in salfile['time'][0:]])
-
-  ind107start = np.argmin(np.abs(timevec - ra107['date'][0]))
-  ind107stop = np.argmin(np.abs(timevec - ra107['date'][-1]))
-
-
-  tindex = [np.where(tempfile['depth'][:] == zz)[0][0] for zz in salfile['depth'][:]]
-  temp_matrix = tempfile['T_20'][ind107start:ind107stop+1].squeeze()
-  temp_matrix[temp_matrix > 40] = np.nan
-  sal_matrix = salfile['S_41'][ind107start:ind107stop+1].squeeze()
-  sal_matrix[sal_matrix > 40] = np.nan
-
-  dens_matrix = sw.pden(sal_matrix, temp_matrix[:,tindex], salfile['depth'][:])
-  # save processed salinity product
-  ra107['sal-dy'] = dict([])
-  ra107['temp-dy'] = dict([])
-  ra107['dens-dy'] = dict([])
-  ra107['dy-time'] = timevec[ind107start:ind107stop+1]
-  for index, zz in enumerate(np.int32(salfile['depth'][:])):
-      ra107['sal-dy'][str(zz)] = sal_matrix[:,index]
-      ra107['temp-dy'][str(zz)] = temp_matrix[:,tindex[index]]
-      ra107['dens-dy'][str(zz)] = dens_matrix[:,index]
-
+  ReadDailyData(ra107)
 #+END_SRC
 
 #+RESULTS:
 
 ** Salinity
-*** Difference between pre- and post-salinity.
+*** Difference: pre- and post-salinity 10m, 20m.
 
-Post-cal salinity is roughly 0.06 psu lower everywhere.
 #+BEGIN_SRC ipython :session :tangle yes :eval never-export :exports results :file images/rama13-sal-pre-post-cal.png
 
+  ax1 = plt.subplot(211)
   plt.plot_date(ra107['date'],
 		ra107['sal-pre']['10'] - ra107['sal-post']['10'], '-')
-  plt.title('RAMA13 pre-cal salinity - post-cal salinity at 10m')
+  plt.ylabel('RAMA13 S_pre - S_post')
+  plt.title('10m')
+
+  ax2 = plt.subplot(212, sharex=ax1)
+  plt.plot_date(ra107['date'],
+		ra107['sal-pre']['20'] - ra107['sal-post']['20'], '-')
+  plt.ylabel('RAMA13 S_pre - S_post')
+  plt.title('20m')
+
+  plt.show()
 #+END_SRC
 
 #+RESULTS:
@@ -321,9 +412,10 @@ Post-cal salinity is roughly 0.06 psu lower everywhere.
   plt.figure()
   plt.plot(ra107['sal'][depth] - ra107['sal-pre'][depth], label='interp-pre')
   plt.plot(ra107['sal'][depth] - ra107['sal-post'][depth], label='interp-post')
-  plt.axhline(0)
+  plt.axhline(0, color='gray', zorder=-100)
   plt.legend()
   plt.title(depth + 'm depth')
+  plt.show()
 #+END_SRC
 
 #+RESULTS:
@@ -398,90 +490,6 @@ There is no post-cal for temperature.
 #+RESULTS:
 [[file:ra107-pre-proc-temp.png]]
 ** 10 min vs. daily data
-*** functions :noexport:
-#+BEGIN_SRC ipython :session  :eval never-exports :tangle yes
-  def Compare10mDyDiff(rama, var, proc='', filt=False, window_len=13):
-      ''' Compares 10m and daily differences of quantities '''
-      import matplotlib as mpl
-      monthsFmt = mpl.dates.DateFormatter("%d-%m")
-
-      if var is 'sal':
-          label = 'S'
-
-      if var is 'temp':
-          label = 'T'
-
-      if var is 'dens':
-          label = 'ρ'
-
-      if proc is not '' and proc[0] is not '-':
-          proc = '-' + proc
-
-      if filt is False:
-          window_len = 2
-
-      depths = list(rama[var].keys())
-      for index, [d1, d2] in enumerate(zip(depths[0:-3], depths[1:-2])):
-          hax = plt.subplot(3,1,index+1)
-          dens1 = smooth(rama[var + proc][d1], window_len=window_len)
-          dens2 = smooth(rama[var + proc][d2], window_len=window_len)
-          plt.plot(rama['date'][0::window_len/2],
-                   dens2[0::window_len/2]-dens1[0::window_len/2], linewidth=1)
-          plt.plot(rama['dy-time'],
-                   rama[var + '-dy'][d2] - rama[var + '-dy'][d1], linewidth=1)
-          plt.axhline(0, color='k')
-          if var is 'sal':
-              plt.axhline(0.06, color='gray')
-              plt.axhline(-0.06, color='gray')
-
-          plt.ylabel('Δ' + label + ' ' + d2 + 'm-' + d1 + 'm')
-          plt.ylim(limy)
-          hax.xaxis.set_major_formatter(monthsFmt)
-
-      plt.gcf().suptitle(proc)
-      plt.show()
-
-  def Compare10mDy(rama, var, proc=''):
-      ''' Plots 10min and daily timeseries of var'''
-      if var is 'sal':
-          label = 'S'
-
-      if var is 'temp':
-          label = 'T'
-
-      if var is 'dens':
-          label = 'ρ'
-
-      if proc is not '' and proc[0] is not '-':
-          proc = '-' + proc
-
-      for index,zz in enumerate(['1', '10', '20', '40']):
-          plt.subplot(4,1,index+1)
-          datenum = mpl.dates.date2num(ra107['date'])
-          plt.plot(datenum, ra107[var + proc][zz], linewidth=1)
-          plt.ylabel(label + ' ' + zz + 'm')
-          plt.plot(ra107['dy-time'], ra107[var + '-dy'][zz], linewidth=1)
-
-            # if index == 0:
-            #     mask = ra107['N2'][0,:] < 0
-
-            # if index == 1:
-            #     mask = np.logical_or(ra107['N2'][0,:] < 0,
-            #                          ra107['N2'][1,:] < 0)
-
-            # if index == 1:
-            #     mask = ra107['N2'][1,:] < 0
-
-            # plt.plot(datenum[mask], ra107[var][zz][mask],
-            # 'r.', markersize=2)
-
-            # plt.xlim([735260, 735280])
-
-      plt.gcf().suptitle(proc)
-      plt.show()
-#+END_SRC
-
-#+RESULTS:
 *** Quality flags for daily data
 Wut, nothing's been flagged as adjusted in the daily data? ¯\ _(ツ)_/¯
 
@@ -831,8 +839,39 @@ Though most points have dS/dz > 0.
 
   ra122 = dict([])
   ra122['date'] = ra122read['date']
-  ra122['sal']  = ra122read['sal']
-  ra122['temp'] = dict([])
+
+  ra122['sal'] = dict([])
+  for depth in ra122read['sal'].dtype.names:
+      ra122['sal'][depth] = ra122read['sal'][depth]
+
+  var = 'temp'
+  ra122read = np.loadtxt('../TAO_raw/temp122a.flg', skiprows=5, dtype=temp,
+			 converters={0:ProcessDate,
+			             1:CleanSalinity,
+			             2:CleanSalinity,
+			             3:CleanSalinity,
+			             4:CleanSalinity,
+			             5:CleanSalinity,
+			             6:CleanSalinity})
+  ra122[var] = dict([])
+  for depth in ra122read[var].dtype.names:
+      ra122[var][depth] = ra122read[var][depth]
+
+  var = 'dens'
+  ra122read = np.loadtxt('../TAO_raw/dens122a.flg', skiprows=5, dtype=dens,
+			 converters={0:ProcessDate,
+			             1:CleanSalinity,
+			             2:CleanSalinity,
+			             3:CleanSalinity,
+			             4:CleanSalinity,
+			             5:CleanSalinity,
+			             6:CleanSalinity})
+  ra122[var] = dict([])
+  for depth in ra122read[var].dtype.names:
+      ra122[var][depth] = ra122read[var][depth]
+
+
+  ReadDailyData(ra122)
 #+END_SRC
 
 #+RESULTS:
@@ -851,6 +890,22 @@ Though most points have dS/dz > 0.
 
 #+RESULTS:
 [[file:images/rama14-pre-cal-salinity.png]]
+
+** Salinity
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/RAMA14-sal-diff.png
+Compare10mDyDiff(ra122, 'sal', '')
+#+END_SRC
+
+#+RESULTS:
+[[file:images/RAMA14-sal-diff.png]]
+
+** Density
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/RAMA14-dens-diff.png
+Compare10mDyDiff(ra122, 'dens', '')
+#+END_SRC
+
+#+RESULTS:
+[[file:images/RAMA14-dens-diff.png]]
 
 * Full record
 ** What are the differences between end of RAMA13 and start of RAMA14
