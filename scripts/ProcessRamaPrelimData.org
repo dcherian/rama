@@ -998,9 +998,13 @@ TS scatter plots change dramatically between 2014 and 2015.
 
 Dots are scattered between 1-Jan-2014/2015 to 31-Dec-2014/2015
 #+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/rama1314-TS.png
+  import sys
+  sys.path.append('/home/deepak/python')
+  import dcpy.oceans as do
 
-  def ScatterTS(rama, depth, tlim=None):
+  def ScatterTS(rama, depth, tlim=None, woa=None):
       import cmocean as cmo
+
       T = rama['temp-dy'][depth][:]
       S = rama['sal-dy'][depth][:]
       t = mpl.dates.date2num(rama['dy-time'][:])
@@ -1010,32 +1014,48 @@ Dots are scattered between 1-Jan-2014/2015 to 31-Dec-2014/2015
       else:
           trange = np.arange(0, len(S))
 
+      colormap = cmo.cm.matter
+
       plt.scatter(S[trange], T[trange], s=30, c=t[trange],
                   alpha=0.65, linewidth=0.15, edgecolor='gray',
-                  cmap=cmo.cm.matter)
+                  cmap=colormap)
       fmt = mpl.dates.DateFormatter('%Y-%m')
       # plt.colorbar(format=fmt)
       if tlim is not None:
           plt.clim(tlim)
-      plt.title(rama['name'] + ' | ' + depth + ' m')
-      plt.xlabel('S'); plt.ylabel('T');
+          plt.title(rama['name'] + ' | ' + depth + ' m')
+          plt.xlabel('S'); plt.ylabel('T');
+
+      if woa is not None:
+          from scipy.stats import mode
+          # figure out year
+          year = mode(np.array([dd.year for dd in mpl.dates.num2date(t[trange])]))[0]
+          woatime = [np.float32(mpl.dates.date2num(dt.datetime(year, ii, 1)))
+                     for ii in np.arange(1,13)]
+
+          plt.scatter(woa['S'], woa['T'], s=4*120, c=np.array(woatime),
+                  alpha=0.5, linewidth=0.15, edgecolor='gray',
+                      cmap=colormap, zorder=-10)
+
+
+  woa = do.ReadWoa(90, 12, 'seasonal', depth=10)
 
   tlim = mpl.dates.date2num([dt.datetime(2014, 1, 1),
                              dt.datetime(2014, 12, 31)]);
   # tlim = None
   ax1 = plt.subplot(221)
-  ScatterTS(ra107, '10', tlim=tlim)
+  ScatterTS(ra107, '10', tlim, woa)
   ax2 = plt.subplot(223, sharex=ax1, sharey=ax1)
-  ScatterTS(ra107, '20', tlim=tlim)
+  ScatterTS(ra107, '20', tlim, woa)
   plt.tight_layout()
 
   tlim = mpl.dates.date2num([dt.datetime(2015, 1, 1),
                              dt.datetime(2015, 12, 31)]);
   # tlim=None
   ax3 = plt.subplot(222, sharex=ax1, sharey=ax1)
-  ScatterTS(ra122, '10', tlim=tlim)
+  ScatterTS(ra122, '10', tlim, woa)
   ax4 = plt.subplot(224, sharex=ax1, sharey=ax1)
-  ScatterTS(ra122, '20', tlim=tlim)
+  ScatterTS(ra122, '20', tlim, woa)
   plt.tight_layout()
   plt.show()
 #+END_SRC
