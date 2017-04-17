@@ -4,6 +4,7 @@
 
 #+LATEX_CLASS: dcnotebook
 
+#+HTML_DOCTYPE: html5
 #+HTML_HEAD: <link rel="stylesheet" href="notebook.css" type="text/css" />
 * Info/emails
 ** Quality Codes:
@@ -175,16 +176,16 @@ p.s. The 10m current data will be posted later, - I'll let you know when those a
       return y[(window_len/2-1):-(window_len/2+1)]
 
 
-  def CleanSalinity(salinity):
+  def Clean(value):
       """ Adds NaNs in place of missing values. """
       import numpy as np
 
-      salinity = np.float32(salinity)
+      value = np.float32(value)
 
-      if salinity > 39:
-          salinity = np.nan
+      if value > 1000:
+          value = np.nan
 
-      return salinity
+      return value
 
   def ProcessDate(datestr):
       """ Takes in string of form YYYYydayHHMM and returns python datetime object."""
@@ -209,6 +210,16 @@ p.s. The 10m current data will be posted later, - I'll let you know when those a
                            ('100', np.float32)]),
 		  ('QQQQQQ', np.uint32),
 		  ('SSSSSS', np.uint32)])
+
+  cond = np.dtype([('date', dt.datetime),
+                   ('cond', [('1', np.float32),
+                             ('10', np.float32),
+                             ('20', np.float32),
+                             ('40', np.float32),
+                             ('60', np.float32),
+                             ('100', np.float32)]),
+		   ('QQQQQQ', np.uint32),
+		   ('SSSSSS', np.uint32)])
 
   temp = np.dtype([('date', dt.datetime),
 		   ('temp', [('1', np.float32),
@@ -267,6 +278,12 @@ p.s. The 10m current data will be posted later, - I'll let you know when those a
           plt.plot(rama['dy-time'],
                    rama[var + '-dy'][d2] - rama[var + '-dy'][d1], linewidth=1)
           plt.axhline(0, color='k')
+          if index == 0:
+              if proc == '':
+                  plt.title('Pre- & Post-cal')
+              else:
+                  plt.title(proc)
+
           if var is 'sal':
               plt.axhline(0.06, color='gray')
               plt.axhline(-0.06, color='gray')
@@ -277,7 +294,7 @@ p.s. The 10m current data will be posted later, - I'll let you know when those a
 
           plt.gcf().suptitle(proc)
 
-          plt.show()
+      plt.show()
 
   def Compare10mDy(rama, var, proc=''):
       ''' Plots 10min and daily timeseries of var'''
@@ -372,13 +389,14 @@ From Sonya:
   ra107['sal']  = dict([])
   ra107['temp'] = dict([])
   ra107['dens'] = dict([])
+  ra107['cond'] = dict([])
   ra107['sal-hr'] = dict([])
   ra107['temp-hr'] = dict([])
   ra107['dens-hr'] = dict([])
 
   cnv = {0:ProcessDate}
   for jj in np.arange(1,7):
-      cnv[jj] = CleanSalinity;
+      cnv[jj] = Clean;
 
   ra107pre = np.loadtxt('../TAO_raw/sal107a.flg', skiprows=5, dtype=sal,
 			converters=cnv)
@@ -387,6 +405,13 @@ From Sonya:
   ra107post = np.loadtxt('../TAO_raw/postcal/sal107a.flg', skiprows=5,
 			 dtype=sal, converters=cnv)
   ra107['sal-post'] = ra107post['sal']
+
+  ra107pre = np.loadtxt('../TAO_raw/cond107a.flg', skiprows=5, dtype=cond,
+			converters=cnv)
+  ra107['cond-pre'] = ra107pre['cond']
+  ra107post = np.loadtxt('../TAO_raw/postcal/cond107a.flg', skiprows=5,
+			 dtype=cond, converters=cnv)
+  ra107['cond-post'] = ra107post['cond']
 
   ra107pre = np.loadtxt('../TAO_raw/dens107a.flg', skiprows=5,
 			dtype=dens, converters=cnv)
@@ -399,7 +424,7 @@ From Sonya:
   # now for pre-calib temperature
   cnv = {0:ProcessDate}
   for jj in np.arange(1,14):
-      cnv[jj] = CleanSalinity;
+      cnv[jj] = Clean;
   ra107pre = np.loadtxt('../TAO_raw/temp107a.flg', skiprows=5,
 			dtype=temp, converters=cnv)
 
@@ -412,13 +437,21 @@ From Sonya:
   for depth in ra107['sal-pre'].dtype.names:
       ra107['dens-pre'][depth] = ra107['dens-pre'][depth] + 1000
       ra107['dens-post'][depth] = ra107['dens-post'][depth] + 1000
-      ra107['temp'][depth] = ra107pre['temp'][depth]
+      ra107['temp'][depth] = smooth(ra107pre['temp'][depth], window_len)
 
       # pre to post-cal interpolation
-      ra107['sal'][depth] = weight_pre * ra107['sal-pre'][depth] \
-                            + weight_post * ra107['sal-post'][depth]
-      ra107['dens'][depth] = weight_pre * ra107['dens-pre'][depth] \
-                            + weight_post * ra107['dens-post'][depth]
+      ra107['cond'][depth] = smooth(weight_pre * ra107['cond-pre'][depth]
+                                    + weight_post * ra107['cond-post'][depth],
+                                    window_len)
+
+      pres = sw.eos80.pres(float(depth), 12)
+      ra107['sal'][depth] = sw.eos80.salt(ra107['cond'][depth]/sw.constants.c3515,
+                                          ra107['temp'][depth],
+                                          pres)
+
+      ra107['dens'][depth] = sw.pden(ra107['sal'][depth],
+                                     ra107['temp'][depth],
+                                     pres)
 
       # filter hourly
       ra107['temp-hr'][depth] = smooth(ra107['temp'][depth], window_len)[0::window_len/2]
@@ -437,12 +470,12 @@ From Sonya:
 			          rama['sal' + proc]['60'],
 			          rama['sal' + proc]['100']])
 
-      rama['temparr'] = np.array([rama['temp' + proc]['1'],
-			           rama['temp' + proc]['10'],
-			           rama['temp' + proc]['20'],
-			           rama['temp' + proc]['40'],
-			           rama['temp' + proc]['60'],
-			           rama['temp' + proc]['100']])
+      rama['temparr'] = np.array([rama['temp']['1'],
+			           rama['temp']['10'],
+			           rama['temp']['20'],
+			           rama['temp']['40'],
+			           rama['temp']['60'],
+			           rama['temp']['100']])
 
       rama['densarr'] = np.array([rama['dens' + proc]['1'],
 			           rama['dens' + proc]['10'],
@@ -451,12 +484,12 @@ From Sonya:
 			           rama['dens' + proc]['60'],
 			           rama['dens' + proc]['100']])
 
-      rama['presarr'] = np.array([1*np.ones(rama['salarr'][0,:].shape),
-			           10*np.ones(rama['salarr'][0,:].shape),
-			           20*np.ones(rama['salarr'][0,:].shape),
-			           40*np.ones(rama['salarr'][0,:].shape),
-			           60*np.ones(rama['salarr'][0,:].shape),
-			           100*np.ones(rama['salarr'][0,:].shape)])
+      rama['presarr'] = sw.pres(np.array([1*np.ones(rama['salarr'][0,:].shape),
+			                  10*np.ones(rama['salarr'][0,:].shape),
+			                  20*np.ones(rama['salarr'][0,:].shape),
+			                  40*np.ones(rama['salarr'][0,:].shape),
+			                  60*np.ones(rama['salarr'][0,:].shape),
+			                  100*np.ones(rama['salarr'][0,:].shape)]), 12)
       return rama
 
 
@@ -477,7 +510,7 @@ The percentage of valid data with N² < 0
 #+BEGIN_SRC ipython :session :eval never-export :exports results
   def TabulateNegativeN2(p_ave, N2, dSdz, dTdz):
       ''' Percentage of valid data that yields N² < 0 '''
-      table = [list(p_ave[:,0]),
+      table = [list(np.round(p_ave[:,0])),
 	       [np.round(len(n[n<0])/len(n)*100) for n in # % N² < 0
 		[N2[i,~np.isnan(N2[i,:])] for i in range(N2.shape[0])]],
 	       [np.round(len(s[s>0])/len(s)*100) for s in # % dS/dz > 0
@@ -507,10 +540,10 @@ The percentage of valid data with N² < 0
 #+END_SRC
 
 #+RESULTS:
-| Depth (m)   |  5.5 | 15.0 | 30.0 | 50.0 | 80.0 |
-| % N² < 0    | 61.0 | 12.0 | 21.0 |  0.0 |  0.0 |
-| % dS/dz > 0 | 53.0 | 19.0 | 28.0 |  1.0 | 15.0 |
-| % dT/dz < 0 | 69.0 | 47.0 | 23.0 |  7.0 |  0.0 |
+| Depth (m)   |  6.0 | 15.0 | 30.0 | 50.0 | 81.0 |
+| % N² < 0    | 61.0 | 12.0 | 20.0 |  0.0 |  0.0 |
+| % dS/dz > 0 | 54.0 | 19.0 | 27.0 |  1.0 | 15.0 |
+| % dT/dz < 0 | 69.0 | 48.0 | 22.0 |  7.0 |  0.0 |
 *** How many exist in /filtered hourly/ data
   #+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export
     MakeArrays(ra107, '-hr')
@@ -535,7 +568,7 @@ The percentage of valid data with N² < 0
   plt.axhline(0, color='k')
   plt.ylabel('Δρ 20m-10m')
   hax.xaxis.set_major_formatter(monthsFmt)
-
+  plt.show()
 #+END_SRC
 
 #+RESULTS:
@@ -589,6 +622,7 @@ Salinity appears to be the controlling factor generally.
   tindex = np.arange(0,dSdz.shape[1])
   # ra107['N2'][ra107['N2'] > 0.05] = np.nan;
 
+  MakeArrays(ra107)
   hax = plt.subplot(311)
   plt.pcolormesh(tindex, -ra107['presarr'],
 		 1e6*-7.6e-5*np.ma.masked_array(dSdz, np.isnan(dSdz)),
@@ -666,14 +700,14 @@ Though most points have dS/dz > 0.
 
   ax1 = plt.subplot(211)
   plt.plot_date(ra107['date'],
-		ra107['sal-pre']['10'] - ra107['sal-post']['10'], '-')
-  plt.ylabel('RAMA13 S_pre - S_post')
+		ra107['sal-post']['10'] - ra107['sal-pre']['10'], '-')
+  plt.ylabel('RAMA13 S_post - S_pre')
   plt.title('10m')
 
   ax2 = plt.subplot(212, sharex=ax1)
   plt.plot_date(ra107['date'],
-		ra107['sal-pre']['20'] - ra107['sal-post']['20'], '-')
-  plt.ylabel('RAMA13 S_pre - S_post')
+		ra107['sal-post']['20'] - ra107['sal-pre']['20'], '-')
+  plt.ylabel('RAMA13 S_post - S_pre')
   plt.title('20m')
 
   plt.show()
@@ -744,7 +778,7 @@ There is no post-cal for temperature.
   # now for pre-calib temperature
   cnv = {0:ProcessDate}
   for jj in np.arange(1,14):
-      cnv[jj] = CleanSalinity;
+      cnv[jj] = Clean;
 
   ra107pre = np.loadtxt('../TAO_raw/temp107a.flg', skiprows=5, dtype=temp,
 			converters=cnv)
@@ -793,7 +827,7 @@ Looks like they depend on the Hanning filter to deal with spiking.
 
 *** Salinity
 #+BEGIN_SRC ipython :session :tangle yes :eval never-export :exports results :file images/rama13-sal-10m-dy.png
-Compare10mDy(ra107, 'sal')
+Compare10mDy(ra107, 'sal', '')
 #+END_SRC
 
 #+RESULTS:
@@ -886,12 +920,12 @@ Compare10mDyDiff(ra107, 'dens', '', filt=True, window_len=13)
 #+BEGIN_SRC ipython :session :tangle yes :eval never-export :exports results
   ra122read = np.loadtxt('../TAO_raw/sal122a.flg', skiprows=5, dtype=sal,
 			 converters={0:ProcessDate,
-			             1:CleanSalinity,
-			             2:CleanSalinity,
-			             3:CleanSalinity,
-			             4:CleanSalinity,
-			             5:CleanSalinity,
-			             6:CleanSalinity})
+			             1:Clean,
+			             2:Clean,
+			             3:Clean,
+			             4:Clean,
+			             5:Clean,
+			             6:Clean})
 
   ra122 = dict([])
   ra122['date'] = ra122read['date']
@@ -904,12 +938,12 @@ Compare10mDyDiff(ra107, 'dens', '', filt=True, window_len=13)
   var = 'temp'
   ra122read = np.loadtxt('../TAO_raw/temp122a.flg', skiprows=5, dtype=temp,
 			 converters={0:ProcessDate,
-			             1:CleanSalinity,
-			             2:CleanSalinity,
-			             3:CleanSalinity,
-			             4:CleanSalinity,
-			             5:CleanSalinity,
-			             6:CleanSalinity})
+			             1:Clean,
+			             2:Clean,
+			             3:Clean,
+			             4:Clean,
+			             5:Clean,
+			             6:Clean})
   ra122[var] = dict([])
   for depth in ra122read[var].dtype.names:
       ra122[var][depth] = ra122read[var][depth]
@@ -917,12 +951,12 @@ Compare10mDyDiff(ra107, 'dens', '', filt=True, window_len=13)
   var = 'dens'
   ra122read = np.loadtxt('../TAO_raw/dens122a.flg', skiprows=5, dtype=dens,
 			 converters={0:ProcessDate,
-			             1:CleanSalinity,
-			             2:CleanSalinity,
-			             3:CleanSalinity,
-			             4:CleanSalinity,
-			             5:CleanSalinity,
-			             6:CleanSalinity})
+			             1:Clean,
+			             2:Clean,
+			             3:Clean,
+			             4:Clean,
+			             5:Clean,
+			             6:Clean})
   ra122[var] = dict([])
   for depth in ra122read[var].dtype.names:
       ra122[var][depth] = ra122read[var][depth] + 1000
@@ -942,15 +976,16 @@ Compare10mDyDiff(ra107, 'dens', '', filt=True, window_len=13)
 
 ** Salinity
 #+BEGIN_SRC ipython :session :tangle yes :eval never-export :exports results :file images/rama14-pre-cal-salinity.png
-    plt.figure()
+  plt.figure()
 
-    for depth in ra122['sal'].dtype.names:
-	  plt.plot_date(ra122['date'][0:-1:6],
-			ra122['sal'][depth][0:-1:6], '-',
-			label=depth, linewidth=1)
+  for depth in ['10', '20', '40']:
+	plt.plot_date(ra122['date'][0:-1:6],
+		      ra122['sal'][depth][0:-1:6], '-',
+		      label=depth, linewidth=1)
 
-    plt.legend()
-    plt.title('ra-122 / RAMA14 pre-cal salinity product')
+  plt.legend()
+  plt.title('ra-122 / RAMA14 pre-cal salinity product')
+  plt.show()
 #+END_SRC
 
 #+RESULTS:
@@ -971,7 +1006,7 @@ Compare10mDyDiff(ra122, 'dens', '')
 #+RESULTS:
 [[file:images/RAMA14-dens-diff.png]]
 
-* Full record
+* RAMA13 & RAMA14
 ** Property plots
 
 #+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/rama1314-T-s-ρ.png
@@ -996,7 +1031,6 @@ Compare10mDyDiff(ra122, 'dens', '')
 
 TS scatter plots change dramatically between 2014 and 2015.
 
-Dots are scattered between 1-Jan-2014/2015 to 31-Dec-2014/2015
 #+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/rama1314-TS.png
   import sys
   sys.path.append('/home/deepak/python')
@@ -1005,12 +1039,12 @@ Dots are scattered between 1-Jan-2014/2015 to 31-Dec-2014/2015
   def ScatterTS(rama, depth, tlim=None, woa=None):
       import cmocean as cmo
 
-      T = rama['temp-dy'][depth][:]
-      S = rama['sal-dy'][depth][:]
-      t = mpl.dates.date2num(rama['dy-time'][:])
+      T = rama['temp'][depth][:]
+      S = rama['sal'][depth][:]
+      t = mpl.dates.date2num(rama['date'][:])
 
       if tlim is not None:
-          trange = np.where(np.logical_and(t >= tlim[0], t <= tlim[1]))
+          trange = np.where(np.logical_and(t >= tlim[0], t <= tlim[1]))[::6]
       else:
           trange = np.arange(0, len(S))
 
@@ -1032,13 +1066,12 @@ Dots are scattered between 1-Jan-2014/2015 to 31-Dec-2014/2015
           year = mode(np.array([dd.year for dd in mpl.dates.num2date(t[trange])]))[0]
           woatime = [np.float32(mpl.dates.date2num(dt.datetime(year, ii, 1)))
                      for ii in np.arange(1,13)]
-
-          plt.scatter(woa['S'], woa['T'], s=4*120, c=np.array(woatime),
+          index = np.where(woa['depth'] == int(depth))
+          plt.scatter(woa['S'][:,index], woa['T'][:,index], s=4*120, c=np.array(woatime),
                   alpha=0.5, linewidth=0.15, edgecolor='gray',
                       cmap=colormap, zorder=-10)
 
-
-  woa = do.ReadWoa(90, 12, 'seasonal', depth=10)
+  woa = do.ReadWoa(90, 12, 'seasonal')
 
   tlim = mpl.dates.date2num([dt.datetime(2014, 1, 1),
                              dt.datetime(2014, 12, 31)]);
@@ -1060,9 +1093,9 @@ Dots are scattered between 1-Jan-2014/2015 to 31-Dec-2014/2015
   plt.show()
 #+END_SRC
 
+#+CAPTION: Small dots are RAMA daily data scattered between 1-Jan-2014/2015 to 31-Dec-2014/2015. Big circles are WOA seasonal climatology colored in the same way as the daily RAMA data. Looks like there's generally spread outside climatological range.
 #+RESULTS:
 [[file:images/rama1314-TS.png]]
-
 ** What are the differences between end of RAMA13 and start of RAMA14
 
 #+BEGIN_SRC ipython :session :tangle yes :eval never-export :exports results
@@ -1078,26 +1111,27 @@ Dots are scattered between 1-Jan-2014/2015 to 31-Dec-2014/2015
       date13 = ra107['date'][~np.isnan(r13)]
 
       diff[index] = (int(depth),
-                     ra122['sal'][depth][0] - r13[-1],
+                     ra122['sal'][depth][6] - r13[-1],
                      ra122['date'][0] - date13[-1])
 
   diff
 #+END_SRC
 
 #+RESULTS:
-: array([(  1,         nan, datetime.timedelta(27, 61200)),
-:        ( 10,  0.02700043, datetime.timedelta(0, 46200)),
-:        ( 20,  0.01599884, datetime.timedelta(0, 46200)),
-:        ( 40,  0.47800064, datetime.timedelta(0, 46200)),
-:        ( 60,  0.0359993 , datetime.timedelta(0, 46200)),
-:        (100,  0.00300217, datetime.timedelta(0, 46200))],
+: array([(1, nan, datetime.timedelta(27, 61200)),
+:        (10, 0.042999267578125, datetime.timedelta(0, 46200)),
+:        (20, 0.036998748779296875, datetime.timedelta(0, 46200)),
+:        (40, 0.006000518798828125, datetime.timedelta(0, 46200)),
+:        (60, -0.004001617431640625, datetime.timedelta(0, 46200)),
+:        (100, 0.02300262451171875, datetime.timedelta(0, 46200))],
 :       dtype=[('depth', '<i4'), ('ΔS', '<f4'), ('Δt', 'O')])
 
 (depth, ΔS, Δtime)
 
 ra107 surface instrument failed a month before recovery.
 
-The rest seem OK except for the 40m instrument: during recovery/deployment there is a big jump of 0.5 psu.
+The rest seem OK except for the 40m instrument: during recovery/deployment there is a big jump of 0.5 psu; but that might be noise at the first time step of RAMA14.
++No, 0.24 psu jump to RAMA14.+ An hour after deployment, difference is 0.01psu; so probably not bad.
 
 #+BEGIN_SRC ipython :session :tangle yes :eval never-export :exports results :file images/ra07-ra122-switch-period.png
   for index, depth in enumerate(ra107['sal'].keys()):
@@ -1151,12 +1185,9 @@ The rest seem OK except for the 40m instrument: during recovery/deployment there
   plt.tight_layout()
 #+END_SRC
 
+#+CAPTION: 40m and 60m instruments seem to be a lot noisier! Emily thinks this is because of the thermocline being sloshed up and down by internal waves.
 #+RESULTS:
 [[file:images/rama13-rama14-full-salinity.png]]
-
-40m and 60m  instruments seem to be a lot noisier!
-
-Emily thinks this is because of the thermocline being sloshed up and down by internal waves.
 
 let's check distribution / variances - variances are only slightly higher.
 
@@ -1185,3 +1216,119 @@ let's check distribution / variances - variances are only slightly higher.
 
 #+RESULTS:
 [[file:images/rama13-rama14-sal-histograms.png]]
+* Full 12n90e record
+
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export
+
+  import netCDF4 as nc
+  import seawater as sw
+
+  ramaT = nc.Dataset('../t12n90e_dy.cdf')
+  ramaS = nc.Dataset('../s12n90e_dy.cdf')
+
+  zind = [np.where(ramaT['depth'][:] == d)[0][0] for d in ramaS['depth'][:]]
+  S = ramaS['S_41'][:].squeeze()
+  T = ramaT['T_20'][:-1, zind, :, :].squeeze()
+  z = ramaS['depth'][:]
+  ρ = sw.pden(S, T, z)
+  t = ramaS['time'][:] + mpl.dates.date2num(dt.datetime(2007, 11, 16, 12, 00, 00))
+
+#+END_SRC
+
+#+RESULTS:
+
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/rama12n90e-drho.png
+  plt.plot_date(t, ρ[:,2] - ρ[:,1], '-',
+		linewidth=1, label='Δρ 20m - 10m')
+  plt.plot_date(t, ρ[:,3] - ρ[:,2], '-',
+		linewidth=1, label='Δρ 40m - 20m')
+  plt.xlim([dt.datetime(2012, 12, 1), dt.datetime(2016, 12, 31)])
+  plt.legend()
+  plt.axhline(0, linestyle='--', color='gray', zorder=-10)
+  plt.gcf().autofmt_xdate()
+  plt.show()
+
+#+END_SRC
+#+CAPTION: Looks like there's a jump in Δρ at 15m at the end of RAMA14 to the next deployment. I should be able to use this to fix RAMA14 somewhat.
+#+RESULTS:
+[[file:images/rama12n90e-drho.png]]
+
+** Differences in daily average values
+
+#+BEGIN_SRC ipython :session :tangle yes :exports none :eval never-export
+  import datetime as dt
+  tdeploy = [[dt.datetime(2013, 11, 30, 12, 00), dt.datetime(2014, 12,  4, 12, 00)],
+             [dt.datetime(2014, 12,  6, 12, 00), dt.datetime(2016,  2, 19, 12, 00)],
+             [dt.datetime(2016,  3, 11, 12, 00), None]]
+
+  diff = dict()
+  diff['0-labels'] = [['ΔT', 'ΔS', 'Δρ']]
+
+  for tt in range(0,2):
+      for zz in range(1,4):
+          if tt == 0:
+	      dep = 'rama13-end'
+          else:
+	      dep = 'rama14-end'
+
+          start = np.where(t == mpl.dates.date2num(tdeploy[tt+1][0]))[0][0]
+          stop  = np.where(t == mpl.dates.date2num(tdeploy[tt][1]))[0][0]
+          dT = T[start,zz] - T[stop,zz]
+          dS = S[start,zz] - S[stop-1,zz]
+          dρ = ρ[start,zz] - ρ[stop-1,zz]
+          diff[str(z[zz]) + '-' + dep] = [dT, dS, dρ]
+
+  diff
+#+END_SRC
+
+#+RESULTS:
+| 0-labels | : | ((ΔT ΔS Δρ)) | 10.0-rama13-end | : | (-0.020000458 -0.7179985 -0.49914551) | 10.0-rama14-end | : | (-0.030000687 -1.6980019 -1.2579956) | 20.0-rama13-end | : | (-0.069999695 -0.56999969 -0.38153076) | 20.0-rama14-end | : | (-0.099998474 -1.5480003 -1.1229248) | 40.0-rama13-end | : | (0.19000053 0.069000244 0.10101318) | 40.0-rama14-end | : | (1.3799992 -0.041999817 -0.23547363) |
+
+
+There is a 3-week gap between end of RAMA14 and next deployment so that jumps are bigger ╮(╯_╰)╭
+
+(This is from released daily data i.e. pre-calib information for RAMA13)
+| 0-labels        | (ΔT ΔS Δρ)             |
+|-----------------+------------------------|
+| 10.0-rama13-end | (-0.020 -0.717 -0.499) |
+| 10.0-rama14-end | (-0.030 -1.698 -1.257) |
+|-----------------+------------------------|
+| 20.0-rama13-end | (-0.069 -0.569 -0.381) |
+| 20.0-rama14-end | (-0.099 -1.548 -1.122) |
+|-----------------+------------------------|
+| 40.0-rama13-end | (0.190 0.069 0.101)    |
+| 40.0-rama14-end | (1.379 -0.042 -0.235)  |
+|-----------------+------------------------|
+* Argo profiles
+** 5904313 aoml
+
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/aoml-argo.png
+
+  import netCDF4 as nc
+
+  argo = nc.Dataset('../argo/5904313/5904313_prof.nc', 'r')
+
+  adate = argo['JULD'][:] \
+          + mpl.dates.date2num(mpl.dates.datetime.datetime(1950, 1, 1))
+
+  profile = np.argmin(np.abs(adate \
+                             - mpl.dates.date2num(
+				 mpl.dates.datetime.datetime(2014, 11, 24))))
+  time = mpl.dates.num2date(adate[profile])
+  plt.title(str(time))
+  plt.plot(argo['PSAL_ADJUSTED'][profile,:], -argo['PRES_ADJUSTED'][profile,:])
+  plt.ylim([-120, 0])
+
+  ind = np.argmin(np.abs(mpl.dates.date2num(ra107['date']) - adate[profile]))
+  MakeArrays(ra107, '-post')
+  plt.plot(ra107['salarr'][:, ind], -ra107['presarr'][:, ind])
+  MakeArrays(ra107, '-pre')
+  plt.plot(ra107['salarr'][:, ind], -ra107['presarr'][:, ind])
+  MakeArrays(ra107, '')
+  plt.plot(ra107['salarr'][:, ind], -ra107['presarr'][:, ind])
+  plt.legend(('argo', 'post', 'pre', 'full'))
+  plt.show()
+#+END_SRC
+
+#+RESULTS:
+[[file:images/aoml-argo.png]]
