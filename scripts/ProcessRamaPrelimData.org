@@ -62,437 +62,25 @@ p.s. The 10m current data will be posted later, - I'll let you know when those a
   import datetime as dt
   import cmocean as cmo
   import seawater as sw
+  from rama import *
   from copy import copy
 
   mpl.rcParams['savefig.transparent'] = True
   mpl.rcParams['figure.figsize'] = [6.5, 6.5]
   mpl.rcParams['figure.dpi'] = 180
   mpl.rcParams['axes.facecolor'] = 'None'
-
-  def PcolorAll(rama, ylim=None):
-      try:
-          MakeArrays(rama)
-      except:
-          pass
-
-      ax1 = plt.subplot(311)
-      PcolorProperty(rama, 'temp', ylim)
-      ax2 = plt.subplot(312, sharex=ax1)
-      PcolorProperty(rama, 'sal', ylim)
-      ax3 = plt.subplot(313, sharex=ax1)
-      PcolorProperty(rama, 'dens', ylim)
-      plt.tight_layout()
-      plt.show()
-
-  def PcolorProperty(rama, varname, ylim=None):
-      import cmocean as cmo
-      import matplotlib as mpl
-
-      if varname is 'sal':
-          # color = cmo.cm.haline_r
-          color = plt.cm.OrRd
-          clim = [31.5, 35]
-
-      if varname is 'temp':
-          color = cmo.cm.thermal
-          clim = [25, 31]
-
-      if varname is 'dens':
-          color = cmo.cm.dense
-          clim = [1019, 1023]
-
-      sz = rama[varname + 'arr'].shape
-      tindex = np.arange(0, sz[1])
-      datex = np.tile(mpl.dates.date2num(rama['date']), (sz[0], 1))
-      plt.contourf(datex, -rama['presarr'],
-                   np.ma.masked_array(rama[varname + 'arr'],
-                                      np.isnan(rama[varname + 'arr'])),
-                   20, cmap=color)
-      plt.colorbar()
-      xfmt = mpl.dates.DateFormatter('%Y-%m')
-      plt.gca().xaxis.set_major_formatter(xfmt)
-      plt.gcf().autofmt_xdate()
-      plt.clim(clim)
-      plt.title(rama['name'] + ' | ' + varname)
-      plt.axhline(-15, color='w', linewidth=1)
-      plt.axhline(-30, color='w', linewidth=1)
-      if ylim is not None:
-          plt.ylim(ylim)
-
-  def smooth(x,window_len=11,window='hanning'):
-      """smooth the data using a window with requested size.
-
-      This method is based on the convolution of a scaled window with the signal.
-      The signal is prepared by introducing reflected copies of the signal
-      (with the window size) in both ends so that transient parts are minimized
-      in the begining and end part of the output signal.
-
-      input:
-          x: the input signal
-          window_len: the dimension of the smoothing window; should be an odd integer
-          window: the type of window from 'flat', 'hanning', 'hamming', 'bartlett', 'blackman'
-          flat window will produce a moving average smoothing.
-
-      output:
-                  the smoothed signal
-
-      example:
-
-      t=linspace(-2,2,0.1)
-                  x=sin(t)+randn(len(t))*0.1
-                  y=smooth(x)
-
-      see also:
-
-      numpy.hanning, numpy.hamming, numpy.bartlett, numpy.blackman, numpy.convolve
-                  scipy.signal.lfilter
-
-      TODO: the window parameter could be the window itself if an array instead of a string
-                  NOTE: length(output) != length(input), to correct this: return y[(window_len/2-1):-(window_len/2)] instead of just y.
-                  """
-
-      if x.ndim != 1:
-          raise ValueError("smooth only accepts 1 dimension arrays.")
-
-      if x.size < window_len:
-          raise ValueError("Input vector needs to be bigger than window size.")
-
-
-      if window_len<3:
-          return x
-
-
-      if not window in ['flat', 'hanning', 'hamming', 'bartlett', 'blackman']:
-          raise ValueError("Window is on of 'flat', 'hanning', 'hamming', 'bartlett', 'blackman'")
-
-      s=np.r_[x[window_len-1:0:-1],x,x[-1:-window_len:-1]]
-      #print(len(s))
-      if window == 'flat': #moving average
-          w=np.ones(window_len,'d')
-      else:
-          w=eval('np.'+window+'(window_len)')
-
-      y=np.convolve(w/w.sum(), s, mode='valid')
-      return y[(window_len/2-1):-(window_len/2+1)]
-
-
-  def Clean(value):
-      """ Adds NaNs in place of missing values. """
-      import numpy as np
-
-      value = np.float32(value)
-
-      if value > 1000:
-          value = np.nan
-
-      return value
-
-  def ProcessDate(datestr):
-      """ Takes in string of form YYYYydayHHMM and returns python datetime object."""
-      import datetime as dt
-
-      year = int(datestr[0:4])
-      yday = int(datestr[4:7])
-      hour = int(datestr[7:9])
-      mins = int(datestr[9:11])
-
-      date = dt.datetime(year=year, month=1, day=1) \
-                               + dt.timedelta(days=yday-1, hours=hour, minutes=mins)
-
-      return date
-
-  sal = np.dtype([('date', dt.datetime),
-                  ('sal', [('1', np.float32),
-                           ('10', np.float32),
-                           ('20', np.float32),
-                           ('40', np.float32),
-                           ('60', np.float32),
-                           ('100', np.float32)]),
-		  ('QQQQQQ', np.uint32),
-		  ('SSSSSS', np.uint32)])
-
-  cond = np.dtype([('date', dt.datetime),
-                   ('cond', [('1', np.float32),
-                             ('10', np.float32),
-                             ('20', np.float32),
-                             ('40', np.float32),
-                             ('60', np.float32),
-                             ('100', np.float32)]),
-		   ('QQQQQQ', np.uint32),
-		   ('SSSSSS', np.uint32)])
-
-  temp = np.dtype([('date', dt.datetime),
-		   ('temp', [('1', np.float32),
-                             ('10', np.float32),
-                             ('13', np.float32),
-                             ('20', np.float32),
-                             ('40', np.float32),
-                             ('60', np.float32),
-                             ('80', np.float32),
-                             ('100', np.float32),
-                             ('120', np.float32),
-                             ('140', np.float32),
-                             ('180', np.float32),
-                             ('300', np.float32),
-                             ('500', np.float32)]),
-                   ('QQQQQQ', np.uint32),
-                   ('SSSSSS', np.uint32)])
-
-  dens = np.dtype([('date', dt.datetime),
-                   ('dens', [('1', np.float32),
-                             ('10', np.float32),
-                            ('20', np.float32),
-                            ('40', np.float32),
-                            ('60', np.float32),
-                            ('100', np.float32)]),
-                   ('QQQQQQ', np.uint32),
-                   ('SSSSSS', np.uint32)])
-
-  def Compare10mDyDiff(rama, var, proc='', filt=False, window_len=13):
-      ''' Compares 10m and daily differences of quantities '''
-      import matplotlib as mpl
-      monthsFmt = mpl.dates.DateFormatter("%d-%m")
-
-      if var is 'sal':
-          label = 'S'
-
-      if var is 'temp':
-          label = 'T'
-
-      if var is 'dens':
-          label = 'ρ'
-
-      if proc is not '' and proc[0] is not '-':
-          proc = '-' + proc
-
-      if filt is False:
-          window_len = 2
-
-      depths = list(rama[var].keys())
-      for index, [d1, d2] in enumerate(zip(depths[0:-3], depths[1:-2])):
-          hax = plt.subplot(3,1,index+1)
-          dens1 = smooth(rama[var + proc][d1], window_len=window_len)
-          dens2 = smooth(rama[var + proc][d2], window_len=window_len)
-          plt.plot(rama['date'][0::window_len/2],
-                   dens2[0::window_len/2]-dens1[0::window_len/2], linewidth=1)
-          plt.plot(rama['dy-time'],
-                   rama[var + '-dy'][d2] - rama[var + '-dy'][d1], linewidth=1)
-          plt.axhline(0, color='k')
-          if index == 0:
-              if proc == '':
-                  plt.title('Pre- & Post-cal')
-              else:
-                  plt.title(proc)
-
-          if var is 'sal':
-              plt.axhline(0.06, color='gray')
-              plt.axhline(-0.06, color='gray')
-
-          plt.ylim([-0.1, 0.4])
-          plt.ylabel('Δ' + label + ' ' + d2 + 'm-' + d1 + 'm')
-          hax.xaxis.set_major_formatter(monthsFmt)
-
-          plt.gcf().suptitle(proc)
-
-      plt.show()
-
-  def Compare10mDy(rama, var, proc=''):
-      ''' Plots 10min and daily timeseries of var'''
-      if var is 'sal':
-          label = 'S'
-
-      if var is 'temp':
-          label = 'T'
-
-      if var is 'dens':
-          label = 'ρ'
-
-      if proc is not '' and proc[0] is not '-':
-          proc = '-' + proc
-
-      for index,zz in enumerate(['1', '10', '20', '40']):
-          plt.subplot(4,1,index+1)
-          datenum = mpl.dates.date2num(ra107['date'])
-          plt.plot(datenum, ra107[var + proc][zz], linewidth=1)
-          plt.ylabel(label + ' ' + zz + 'm')
-          plt.plot(ra107['dy-time'], ra107[var + '-dy'][zz], linewidth=1)
-
-          # if index == 0:
-          #     mask = ra107['N2'][0,:] < 0
-
-          # if index == 1:
-          #     mask = np.logical_or(ra107['N2'][0,:] < 0,
-          #                          ra107['N2'][1,:] < 0)
-
-          # if index == 1:
-          #     mask = ra107['N2'][1,:] < 0
-
-          # plt.plot(datenum[mask], ra107[var][zz][mask],
-          # 'r.', markersize=2)
-
-          # plt.xlim([735260, 735280])
-
-          plt.gcf().suptitle(proc)
-
-      plt.show()
-
-  # read netCDF data
-  def ReadDailyData(rama, salfilename='../s12n90e_dy.cdf',
-                    tempfilename='../t12n90e_dy.cdf'):
-      import netCDF4 as nc
-
-      salfile = nc.Dataset(salfilename)
-      tempfile = nc.Dataset(tempfilename)
-
-      # t0 = np.datetime64(salfile['time'].units[14:])
-      t0 = dt.datetime.strptime(salfile['time'].units[11:],
-				'%Y-%m-%d %H:%M:%S')
-      timevec = np.array([t0 + dt.timedelta(days=tt.astype('float')) \
-                          for tt in salfile['time'][0:]])
-
-      indstart = np.argmin(np.abs(timevec - rama['date'][0]))
-      indstop = np.argmin(np.abs(timevec - rama['date'][-1]))
-
-      tindex = [np.where(tempfile['depth'][:] == zz)[0][0] for zz in salfile['depth'][:]]
-      temp_matrix = tempfile['T_20'][indstart:indstop+1].squeeze()
-      temp_matrix[temp_matrix > 40] = np.nan
-      sal_matrix = salfile['S_41'][indstart:indstop+1].squeeze()
-      sal_matrix[sal_matrix > 40] = np.nan
-
-      dens_matrix = sw.pden(sal_matrix, temp_matrix[:,tindex], salfile['depth'][:])
-      # save processed salinity product
-      rama['sal-dy'] = dict([])
-      rama['temp-dy'] = dict([])
-      rama['dens-dy'] = dict([])
-      rama['dy-time'] = timevec[indstart:indstop+1]
-
-      for index, zz in enumerate(np.int32(salfile['depth'][:])):
-          rama['sal-dy'][str(zz)] = sal_matrix[:,index]
-          rama['temp-dy'][str(zz)] = temp_matrix[:,tindex[index]]
-          rama['dens-dy'][str(zz)] = dens_matrix[:,index]
 #+END_SRC
 
 #+RESULTS:
 
 * RAMA13 (ra-107)
 ** Read data
-From Sonya:
 #+BEGIN_quote
   I'd apply a /pre-to-post-cal linear interpolation/ across the data to correct for large-scale drifts (i.e. the first data value in the interpolated output would have a pre-cal applied, while the last value would have a post-cal applied, with the values interpolated in between).
 #+END_QUOTE
 
 #+BEGIN_SRC ipython :session :tangle yes :eval never-export :exports results
-
-  # setup a mooring dictionary
-  ra107 = dict([])
-  ra107['name'] = 'RAMA13'
-  ra107['sal']  = dict([])
-  ra107['temp'] = dict([])
-  ra107['dens'] = dict([])
-  ra107['cond'] = dict([])
-  ra107['sal-hr'] = dict([])
-  ra107['temp-hr'] = dict([])
-  ra107['dens-hr'] = dict([])
-
-  cnv = {0:ProcessDate}
-  for jj in np.arange(1,7):
-      cnv[jj] = Clean;
-
-  ra107pre = np.loadtxt('../TAO_raw/sal107a.flg', skiprows=5, dtype=sal,
-			converters=cnv)
-  ra107['sal-pre'] = ra107pre['sal']
-  ra107['date'] = ra107pre['date']
-  ra107post = np.loadtxt('../TAO_raw/postcal/sal107a.flg', skiprows=5,
-			 dtype=sal, converters=cnv)
-  ra107['sal-post'] = ra107post['sal']
-
-  ra107pre = np.loadtxt('../TAO_raw/cond107a.flg', skiprows=5, dtype=cond,
-			converters=cnv)
-  ra107['cond-pre'] = ra107pre['cond']
-  ra107post = np.loadtxt('../TAO_raw/postcal/cond107a.flg', skiprows=5,
-			 dtype=cond, converters=cnv)
-  ra107['cond-post'] = ra107post['cond']
-
-  ra107pre = np.loadtxt('../TAO_raw/dens107a.flg', skiprows=5,
-			dtype=dens, converters=cnv)
-  ra107['dens-pre'] = ra107pre['dens']
-
-  ra107post = np.loadtxt('../TAO_raw/postcal/dens107a.flg', skiprows=5,
-			 dtype=dens, converters=cnv)
-  ra107['dens-post'] = ra107post['dens']
-
-  # now for pre-calib temperature
-  cnv = {0:ProcessDate}
-  for jj in np.arange(1,14):
-      cnv[jj] = Clean;
-  ra107pre = np.loadtxt('../TAO_raw/temp107a.flg', skiprows=5,
-			dtype=temp, converters=cnv)
-
-  Ntime = len(ra107pre['date'])
-
-  weight_pre = np.arange(Ntime-1,-1,-1)/(Ntime-1)
-  weight_post = np.arange(0,Ntime)/(Ntime-1)
-
-  window_len = 13
-  for depth in ra107['sal-pre'].dtype.names:
-      ra107['dens-pre'][depth] = ra107['dens-pre'][depth] + 1000
-      ra107['dens-post'][depth] = ra107['dens-post'][depth] + 1000
-      ra107['temp'][depth] = smooth(ra107pre['temp'][depth], window_len)
-
-      # pre to post-cal interpolation
-      ra107['cond'][depth] = smooth(weight_pre * ra107['cond-pre'][depth]
-                                    + weight_post * ra107['cond-post'][depth],
-                                    window_len)
-
-      pres = sw.eos80.pres(float(depth), 12)
-      ra107['sal'][depth] = sw.eos80.salt(ra107['cond'][depth]/sw.constants.c3515,
-                                          ra107['temp'][depth],
-                                          pres)
-
-      ra107['dens'][depth] = sw.pden(ra107['sal'][depth],
-                                     ra107['temp'][depth],
-                                     pres)
-
-      # filter hourly
-      ra107['temp-hr'][depth] = smooth(ra107['temp'][depth], window_len)[0::window_len/2]
-      ra107['sal-hr'][depth] = smooth(ra107['sal'][depth], window_len)[0::window_len/2]
-      ra107['dens-hr'][depth] = smooth(ra107['dens'][depth], window_len)[0::window_len/2]
-
-  ra107['hr-time'] = ra107['date'][0::window_len/2]
-
-  ReadDailyData(ra107)
-
-  def MakeArrays(rama, proc=''):
-      rama['salarr'] = np.array([rama['sal' + proc]['1'],
-			          rama['sal' + proc]['10'],
-			          rama['sal' + proc]['20'],
-			          rama['sal' + proc]['40'],
-			          rama['sal' + proc]['60'],
-			          rama['sal' + proc]['100']])
-
-      rama['temparr'] = np.array([rama['temp']['1'],
-			           rama['temp']['10'],
-			           rama['temp']['20'],
-			           rama['temp']['40'],
-			           rama['temp']['60'],
-			           rama['temp']['100']])
-
-      rama['densarr'] = np.array([rama['dens' + proc]['1'],
-			           rama['dens' + proc]['10'],
-			           rama['dens' + proc]['20'],
-			           rama['dens' + proc]['40'],
-			           rama['dens' + proc]['60'],
-			           rama['dens' + proc]['100']])
-
-      rama['presarr'] = sw.pres(np.array([1*np.ones(rama['salarr'][0,:].shape),
-			                  10*np.ones(rama['salarr'][0,:].shape),
-			                  20*np.ones(rama['salarr'][0,:].shape),
-			                  40*np.ones(rama['salarr'][0,:].shape),
-			                  60*np.ones(rama['salarr'][0,:].shape),
-			                  100*np.ones(rama['salarr'][0,:].shape)]), 12)
-      return rama
-
-
+ra107 = Initialize('RAMA13', '107')
 #+END_SRC
 
 #+RESULTS:
@@ -525,17 +113,10 @@ The percentage of valid data with N² < 0
 
       return table
 
-  def CalcGradients(rama):
-      dSdz = -np.diff(rama['salarr'], axis=0)/np.diff(rama['presarr'], axis=0)
-      dTdz = -np.diff(rama['temparr'], axis=0)/np.diff(rama['presarr'], axis=0)
-
-      N2,_,p_ave = sw.bfrq(rama['salarr'], rama['temparr'], rama['presarr'], 12)
-      rama['N2'] = N2
-      return (dSdz, dTdz, N2, p_ave)
 
   MakeArrays(ra107)
-  dSdz, dTdz, N2, p_ave = CalcGradients(ra107)
-  table = TabulateNegativeN2(p_ave, N2, dSdz, dTdz)
+  dSdz, dTdz, N2ρ, p_ave = CalcGradients(ra107)
+  table = TabulateNegativeN2(p_ave, N2ρ, dSdz, dTdz)
   table
 #+END_SRC
 
@@ -1010,18 +591,9 @@ Compare10mDyDiff(ra122, 'dens', '')
 ** Property plots
 
 #+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/rama1314-T-s-ρ.png
-  def RamaStitch(ra1, ra2):
 
-      rama = dict()
-      rama['name'] = 'RAMA 13,14'
-      rama['date'] = np.concatenate((ra1['date'], ra2['date']), axis=0)
-      for pp in ['densarr', 'salarr', 'temparr', 'presarr']:
-          rama[pp] = np.concatenate((ra1[pp],ra2[pp]), axis=1)
-
-      return rama
-
-  ramafull = RamaStitch(ra107, ra122)
-  PcolorAll(ramafull, ylim=[-50,0])
+ramafull = RamaStitch(ra107, ra122)
+PcolorAll(ramafull, ylim=[-50,0])
 #+END_SRC
 
 #+RESULTS:
@@ -1032,45 +604,6 @@ Compare10mDyDiff(ra122, 'dens', '')
 TS scatter plots change dramatically between 2014 and 2015.
 
 #+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/rama1314-TS.png
-  import sys
-  sys.path.append('/home/deepak/python')
-  import dcpy.oceans as do
-
-  def ScatterTS(rama, depth, tlim=None, woa=None):
-      import cmocean as cmo
-
-      T = rama['temp'][depth][:]
-      S = rama['sal'][depth][:]
-      t = mpl.dates.date2num(rama['date'][:])
-
-      if tlim is not None:
-          trange = np.where(np.logical_and(t >= tlim[0], t <= tlim[1]))[::6]
-      else:
-          trange = np.arange(0, len(S))
-
-      colormap = cmo.cm.matter
-
-      plt.scatter(S[trange], T[trange], s=30, c=t[trange],
-                  alpha=0.65, linewidth=0.15, edgecolor='gray',
-                  cmap=colormap)
-      fmt = mpl.dates.DateFormatter('%Y-%m')
-      # plt.colorbar(format=fmt)
-      if tlim is not None:
-          plt.clim(tlim)
-          plt.title(rama['name'] + ' | ' + depth + ' m')
-          plt.xlabel('S'); plt.ylabel('T');
-
-      if woa is not None:
-          from scipy.stats import mode
-          # figure out year
-          year = mode(np.array([dd.year for dd in mpl.dates.num2date(t[trange])]))[0]
-          woatime = [np.float32(mpl.dates.date2num(dt.datetime(year, ii, 1)))
-                     for ii in np.arange(1,13)]
-          index = np.where(woa['depth'] == int(depth))
-          plt.scatter(woa['S'][:,index], woa['T'][:,index], s=4*120, c=np.array(woatime),
-                  alpha=0.5, linewidth=0.15, edgecolor='gray',
-                      cmap=colormap, zorder=-10)
-
   woa = do.ReadWoa(90, 12, 'seasonal')
 
   tlim = mpl.dates.date2num([dt.datetime(2014, 1, 1),
@@ -1219,10 +752,6 @@ let's check distribution / variances - variances are only slightly higher.
 * Full 12n90e record
 
 #+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export
-
-  import netCDF4 as nc
-  import seawater as sw
-
   ramaT = nc.Dataset('../t12n90e_dy.cdf')
   ramaS = nc.Dataset('../s12n90e_dy.cdf')
 
@@ -1303,31 +832,7 @@ There is a 3-week gap between end of RAMA14 and next deployment so that jumps ar
 ** 5904313 aoml
 
 #+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/aoml-argo.png
-
-  import netCDF4 as nc
-
-  argo = nc.Dataset('../argo/5904313/5904313_prof.nc', 'r')
-
-  adate = argo['JULD'][:] \
-          + mpl.dates.date2num(mpl.dates.datetime.datetime(1950, 1, 1))
-
-  profile = np.argmin(np.abs(adate \
-                             - mpl.dates.date2num(
-				 mpl.dates.datetime.datetime(2014, 11, 24))))
-  time = mpl.dates.num2date(adate[profile])
-  plt.title(str(time))
-  plt.plot(argo['PSAL_ADJUSTED'][profile,:], -argo['PRES_ADJUSTED'][profile,:])
-  plt.ylim([-120, 0])
-
-  ind = np.argmin(np.abs(mpl.dates.date2num(ra107['date']) - adate[profile]))
-  MakeArrays(ra107, '-post')
-  plt.plot(ra107['salarr'][:, ind], -ra107['presarr'][:, ind])
-  MakeArrays(ra107, '-pre')
-  plt.plot(ra107['salarr'][:, ind], -ra107['presarr'][:, ind])
-  MakeArrays(ra107, '')
-  plt.plot(ra107['salarr'][:, ind], -ra107['presarr'][:, ind])
-  plt.legend(('argo', 'post', 'pre', 'full'))
-  plt.show()
+ArgoPlot(ra107, mpl.dates.datetime.datetime(2014, 11, 24), '59043413')
 #+END_SRC
 
 #+RESULTS:
