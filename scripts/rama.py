@@ -20,6 +20,7 @@ def Initialize(name, fname):
     rama['sal'] = dict([])
     rama['temp'] = dict([])
     rama['dens'] = dict([])
+    rama['cond'] = dict([])
     rama['sal-hr'] = dict([])
     rama['temp-hr'] = dict([])
     rama['dens-hr'] = dict([])
@@ -105,7 +106,7 @@ def ReadPrelimData(rama, fname):
         if value > 100:
             value = np.nan
 
-            return value
+        return value
 
     def ProcessDate(datestr):
         """ Takes in string of form YYYYydayHHMM and returns
@@ -142,9 +143,11 @@ def ReadPrelimData(rama, fname):
     rama['hr-time'] = rama['date'][0::window_len/2]
 
     # ############# conductivity
+    ramapre = np.loadtxt('../TAO_raw/cond' + fname + 'a.flg',
+                         skiprows=5, dtype=cond, converters=cnv)
     rama['cond-pre'] = ramapre['cond']
-    ramapost = np.loadtxt('../TAO_raw/postcal/cond107a.flg', skiprows=5,
-                          dtype=cond, converters=cnv)
+    ramapost = np.loadtxt('../TAO_raw/postcal/cond' + fname + 'a.flg',
+                          skiprows=5, dtype=cond, converters=cnv)
     rama['cond-post'] = ramapost['cond']
 
     # ############# density
@@ -705,3 +708,21 @@ def CalN2(curve, ρ, depth, N2z, interp=False, doplot=False):
         dρdz = y0/Z * (1 - np.tanh((N2z-z0)/Z)**2)
 
     return 9.81/1025 * dρdz
+
+
+def TabulateNegativeN2(p_ave, N2, dSdz, dTdz):
+    ''' Percentage of valid data that yields N² < 0 '''
+    table = [list(np.round(p_ave[:,0])),
+             [np.round(len(n[n<0])/len(n)*100) for n in # % N² < 0
+              [N2[i,~np.isnan(N2[i,:])] for i in range(N2.shape[0])]],
+             [np.round(len(s[s>0])/len(s)*100) for s in # % dS/dz > 0
+              [dSdz[i,~np.isnan(dSdz[i,:])] for i in range(dSdz.shape[0])]],
+             [np.round(len(s[s<0])/len(s)*100) for s in # % dT/dz > 0
+              [dTdz[i,~np.isnan(dTdz[i,:])] for i in range(dTdz.shape[0])]]]
+
+    table[0].insert(0, 'Depth (m)')
+    table[1].insert(0, '% N² < 0')
+    table[2].insert(0, '% dS/dz > 0')
+    table[3].insert(0, '% dT/dz < 0')
+
+    return table
