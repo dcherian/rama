@@ -24,6 +24,8 @@ def Initialize(name, fname):
     rama['sal-hr'] = dict([])
     rama['temp-hr'] = dict([])
     rama['dens-hr'] = dict([])
+    rama['N2fit'] = dict()
+    rama['N2z'] = dict()
 
     rama = ReadPrelimData(rama, fname)
 
@@ -235,7 +237,8 @@ def SaveRama(rama, proc=''):
              'sal': rama['salarr'],
              'temp': rama['temparr'],
              'depth': rama['presarr'][:, 0],
-             'N2': rama['N2fit']}
+             'N2': rama['N2fit'],
+             'N2z': rama['N2z']}
 
     savemat('../RamaPrelimProcessed/' + rama['name'],
             mdict, do_compression=True)
@@ -381,40 +384,6 @@ def Compare10mDy(rama, var, proc=''):
 
     plt.gcf().suptitle(proc)
     plt.show()
-
-
-def SaveRama(rama, proc=''):
-    ''' This saves a (depth, time) matrix of temp, sal, pres to
-    RamaPrelimProcessed/rama['name'].mat '''
-
-    from scipy.io import savemat
-
-    def datetime2matlabdn(dt):
-        import datetime as date
-
-        mdn = dt + date.timedelta(days=366)
-        frac = (dt - date.datetime(dt.year, dt.month,
-                                   dt.day, 0, 0, 0)).seconds \
-                                   / (24.0 * 60.0 * 60.0)
-        return mdn.toordinal() + frac
-
-    MakeArrays(rama, proc)
-
-    if proc is '':
-        datevec = rama['date']
-    else:
-        if proc[0] is '-':
-            proc = proc[1:]
-
-        datevec = rama[proc + '-time']
-
-    datenum = np.array([datetime2matlabdn(dd) for dd in datevec])
-    mdict = {'time': datenum,
-             'sal': rama['salarr'],
-             'temp': rama['temparr'],
-             'depth': rama['presarr'][:, 0]}
-
-    savemat('RamaPrelimProcessed/' + rama['name'], mdict, do_compression=True)
 
 
 def PcolorAll(rama, ylim=None):
