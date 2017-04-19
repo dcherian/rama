@@ -612,7 +612,7 @@ def N2fit(ρ, depth, depth0=None, curve='tanh', doplot=False,
     else:
         from joblib import Parallel, delayed
 
-        N2 = Parallel(n_jobs=-1)(delayed(CalN2)(ρ[:, t], depth, N2z, t+39000, curve)
+        N2 = Parallel(n_jobs=-1)(delayed(CalN2)(ρ[:, t], depth, N2z, t, curve)
                                  for t in np.arange(ntime))
 
     return [np.array(N2), N2z]

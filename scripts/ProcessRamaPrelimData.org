@@ -62,6 +62,8 @@ p.s. The 10m current data will be posted later, - I'll let you know when those a
   import datetime as dt
   import cmocean as cmo
   import seawater as sw
+  import rama
+  import importlib
   from rama import *
   from copy import copy
 
@@ -80,7 +82,9 @@ p.s. The 10m current data will be posted later, - I'll let you know when those a
 #+END_QUOTE
 
 #+BEGIN_SRC ipython :session :tangle yes :eval never-export :exports results
-ra107 = Initialize('RAMA13', '107')
+rama = importlib.reload(rama)
+
+ra107 = rama.Initialize('RAMA13', '107')
 #+END_SRC
 
 #+RESULTS:
@@ -96,24 +100,6 @@ ra107 = Initialize('RAMA13', '107')
 *** How many exist in /10 minute/ data
 The percentage of valid data with N² < 0
 #+BEGIN_SRC ipython :session :eval never-export :exports results
-  def TabulateNegativeN2(p_ave, N2, dSdz, dTdz):
-      ''' Percentage of valid data that yields N² < 0 '''
-      table = [list(np.round(p_ave[:,0])),
-	       [np.round(len(n[n<0])/len(n)*100) for n in # % N² < 0
-		[N2[i,~np.isnan(N2[i,:])] for i in range(N2.shape[0])]],
-	       [np.round(len(s[s>0])/len(s)*100) for s in # % dS/dz > 0
-		[dSdz[i,~np.isnan(dSdz[i,:])] for i in range(dSdz.shape[0])]],
-	       [np.round(len(s[s<0])/len(s)*100) for s in # % dT/dz > 0
-		[dTdz[i,~np.isnan(dTdz[i,:])] for i in range(dTdz.shape[0])]]]
-
-      table[0].insert(0, 'Depth (m)')
-      table[1].insert(0, '% N² < 0')
-      table[2].insert(0, '% dS/dz > 0')
-      table[3].insert(0, '% dT/dz < 0')
-
-      return table
-
-
   MakeArrays(ra107)
   dSdz, dTdz, N2ρ, p_ave = CalcGradients(ra107)
   table = TabulateNegativeN2(p_ave, N2ρ, dSdz, dTdz)
@@ -128,8 +114,8 @@ The percentage of valid data with N² < 0
 *** How many exist in /filtered hourly/ data
   #+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export
     MakeArrays(ra107, '-hr')
-    dSdz, dTdz, N2, p_ave = CalcGradients(ra107)
-    table = TabulateNegativeN2(p_ave, N2, dSdz, dTdz)
+    dSdz, dTdz, N2ρhr, p_ave = CalcGradients(ra107)
+    table = TabulateNegativeN2(p_ave, N2ρhr, dSdz, dTdz)
     table
   #+END_SRC
 
@@ -158,9 +144,9 @@ The percentage of valid data with N² < 0
 *** Funny density offset/trends appear to result from salinity.
 
 #+BEGIN_SRC ipython :session :tangle yes :eval never-export :exports results :file images/rama13-sal-diff.png
-  N2 = np.zeros([2, len(ra107['sal']['10'])])
-  N2[0,:] = -9.81/1028 * (ra107['sal']['10']-ra107['sal']['20'])/10
-  N2[1,:] = -9.81/1028 * (ra107['sal']['20']-ra107['sal']['40'])/20
+  # N2 = np.zeros([2, len(ra107['sal']['10'])])
+  # N2[0,:] = -9.81/1028 * (ra107['sal']['10']-ra107['sal']['20'])/10
+  # N2[1,:] = -9.81/1028 * (ra107['sal']['20']-ra107['sal']['40'])/20
 
   limy = [-0.2, 0.4]
 
@@ -457,42 +443,94 @@ Compare10mDyDiff(ra107, 'dens', '', filt=True, window_len=13)
 
 #+RESULTS:
 [[file:images/rama13-dens-diff-10m-dy.png]]
+** Fit tanh to ρ
+
+Spline fits don't work well.
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/N2-fit.png
+  import rama
+  rama = importlib.reload(rama)
+  rama.MakeArrays(ra107)
+  try:
+      dcpy.fits = importlib.reload(dcpy.fits)
+  except:
+      pass
+
+  var = 'densarr'
+  # zarr = np.array([1.0, 10.0, 20.0, 40.0, 60.0, 100.0]) + 1e-5
+  zarr = ra107['presarr'][:, 0]
+  curve = 'tanh'
+  plt.subplot(311)
+  N2, N2z = rama.N2fit(ra107[var], zarr, tt=20290,
+		       depth0=15, doplot=True, curve=curve)
+
+  plt.subplot(312)
+  N2, N2z = rama.N2fit(ra107[var], zarr, tt=22130,
+		       depth0=15, doplot=True, curve=curve)
+
+  plt.subplot(313)
+  N2, N2z = rama.N2fit(ra107[var], zarr, tt=50400,
+			depth0=15, doplot=True, curve=curve)
+
+  plt.tight_layout()
+  plt.show()
+#+END_SRC
+#+CAPTION: Doing fit and weighting differently according to season works well. The 60m is too strong a constraint.
+#+RESULTS:
+[[file:images/N2-fit.png]]
+
+
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export
+  # do the calculation
+  rama = importlib.reload(rama)
+  dcpy.fits = importlib.reload(dcpy.fits)
+
+  %time N2, N2z = rama.N2fit(ra107['densarr'][:, 0::1], ra107['presarr'][:, 0], depth0=[15, 30])
+
+  ra107['N2fit'][0::1, :] = N2
+  ra107['N2z'] = N2z
+#+END_SRC
+
+#+RESULTS:
+
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/N2-fit-compare.png
+
+  import rama
+  rama = importlib.reload(rama)
+
+  _, _, N2ρ, _ = rama.CalcGradients(ra107)
+
+  plt.clf()
+  plt.subplot(211)
+  plt.plot_date(ra107['date'], N2ρ[1, :]*1e4, '-', linewidth=1, alpha=0.7)
+  plt.plot_date(ra107['date'][0::1],
+		rama.smooth(ra107['N2fit'][:, 0]*1e4, window_len=7), '-', linewidth=1, alpha=0.6)
+  plt.axhline(0, color='gray', zorder=-1)
+  plt.legend(('diff', 'fit'))
+  plt.ylabel('N² x 1e-4')
+  plt.title('15 m')
+
+  plt.subplot(212)
+  plt.plot_date(ra107['date'], N2ρ[2, :]*1e4, '-', linewidth=1, alpha=0.7)
+  plt.plot_date(ra107['date'][0::1],
+		smooth(ra107['N2fit'][:, 1]*1e4, window_len=7), '-', linewidth=1, alpha=0.6)
+  plt.axhline(0, color='gray', zorder=-1)
+  plt.legend(('diff', 'fit'))
+  plt.ylim([-1, 17])
+  plt.ylabel('N² x 1e-4')
+  plt.title('30 m')
+
+  plt.show()
+#+END_SRC
+
+#+CAPTION: Hourly smoothed N² fit.
+#+RESULTS:
+[[file:images/N2-fit-compare.png]]
+
 ** Save data
 
 #+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export
-  def SaveRama(rama, proc=''):
-      ''' This saves a (depth, time) matrix of temp, sal, pres to
-      RamaPrelimProcessed/rama['name'].mat '''
-
-      from scipy.io import savemat
-
-      def datetime2matlabdn(dt):
-          import datetime as date
-          ord = dt.toordinal()
-          mdn = dt + date.timedelta(days = 366)
-          frac = (dt-date.datetime(dt.year,dt.month,dt.day,0,0,0)).seconds \
-		 / (24.0 * 60.0 * 60.0)
-          return mdn.toordinal() + frac
-
-      MakeArrays(rama, proc)
-
-      if proc is '':
-          datevec = rama['date']
-      else:
-          if proc[0] is '-':
-              proc = proc[1:]
-
-          datevec = rama[proc + '-time']
-
-      datenum = np.array([datetime2matlabdn(dd) for dd in datevec])
-      mdict = {'time' : datenum,
-	       'sal' : rama['salarr'],
-	       'temp' : rama['temparr'],
-	       'depth' : rama['presarr'][:,0]}
-
-      savemat('../RamaPrelimProcessed/' + rama['name'], mdict, do_compression=True)
-
-  SaveRama(ra107)
+  rama = importlib.reload(rama)
+  rama.SaveRama(ra107)
 #+END_SRC
 
 #+RESULTS:
