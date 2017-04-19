@@ -570,9 +570,9 @@ def CalcGradients(rama):
     return (dSdz, dTdz, N2, p_ave)
 
 
-def N2fit(ρ, depth, depth0=None, curve='tanh', doplot=False, interp=False):
-    '''
-    Determine N² by fitting curve to ρ profile.
+def N2fit(ρ, depth, depth0=None, curve='tanh', doplot=False,
+          interp=False, tt=None):
+    ''' Determine N² by fitting curve to ρ profile.
 
     Input:
         ρ = fn.(depth, time)
@@ -585,71 +585,69 @@ def N2fit(ρ, depth, depth0=None, curve='tanh', doplot=False, interp=False):
 
     Output:
         N2 = fn.(time)
-        N2z = depth grid for N2 '''
+        N2z = depth grid for N2
+    '''
 
     import numpy as np
 
     if depth0 is None:
         depth0 = depth
 
-    N2z = np.asarray(depth0)
+    N2z = np.asarray(np.float64(depth0))
+    depth = np.float64(depth)
 
-    if ρ.ndim > 1:
+    if tt is None:
         ntime = ρ.shape[1]
     else:
         ntime = 1
 
-    # N2 = np.zeros((ntime,))
+    if ntime == 1:
+        N2 = CalN2(ρ[:, tt], depth, N2z, tt=tt, curve=curve, doplot=doplot)
+        if doplot:
+            N2line = 9.81/1025*(ρ[2, tt]-ρ[1, tt])/(depth[2] - depth[1])
+            import matplotlib.pyplot as plt
+            plt.title('N2fit = ' + "{:1.3e}".format(N2)
+                      + ' | N2line = ' + "{:1.3e}".format(N2line))
 
-    if ntime >= 1000:
+    else:
         from joblib import Parallel, delayed
 
-        N2 = Parallel(n_jobs=-1)(
-            delayed(CalN2)(curve, ρ[:, tt], depth, N2z, interp)
-            for tt in np.arange(ρ.shape[1]))
-    else:
-        if ntime == 1:
-            N2 = CalN2(curve, ρ, depth, N2z, doplot=doplot)
-            if doplot:
-                N2line = 9.81/1025*(ρ[2]-ρ[1])/(depth[2] - depth[1])
-                import matplotlib.pyplot as plt
-                plt.title('N2fit = ' + "{:1.3e}".format(N2)
-                          + ' | N2line = ' + "{:1.3e}".format(N2line))
-        else:
-            N2 = np.apply_along_axis(CalN2, 0, curve, ρ, depth,
-                                     N2z, interp=False)
-
-    # if ntime < 1e1:
-    #     for tt in np.arange(ntime):
-    #         N2[tt] = CalN2(depth, ρ[:, tt], interp)
-    # else:
-    #     from joblib import Parallel, delayed
-    #     Parallel(n_jobs=4)(delayed(CalN2)(depth, rho, interp)
-    #                        for rho in )
+        N2 = Parallel(n_jobs=-1)(delayed(CalN2)(ρ[:, t], depth, N2z, t+39000, curve)
+                                 for t in np.arange(ntime))
 
     return [np.array(N2), N2z]
 
 
-def CalN2(curve, ρ, depth, N2z, interp=False, doplot=False):
+def CalN2(ρ, depth, N2z, tt, curve='tanh', interp=False, doplot=False):
     ''' Used for parallel call from N2Tanh below. '''
     from dcpy.fits import fit
     import numpy as np
 
     mask = np.isfinite(ρ)
-    mw = 2  # max weight
-    weights = 1/np.array([1, 1e-1, mw, 1, 1e-2, 1])
-
     if np.sum(mask) < 3:
         # less than 3 valid points
         return np.nan
+
+    mw = 2  # max weight
+    weights = np.array([1, 1e-1, mw, 1, 1e-1, 1e-4])
+
+    # accounts for summer peak in N²
+    if tt < 22430 and tt > 18700:
+        weights[1] = mw+2
+        weights[2] = mw+2
+        weights[-2] = 1
+    else:
+        if tt > 40000:
+            weights[1] = mw
+            weights[-1] = 1
 
     num_try = 0
     Z = 1e4
     Zthresh = 1000
 
-    if mask[0] is False:
+    if mask[0] is False and weights[1] < 1:
         # surface sensor has failed. need to use 10m sensor
-        weights[1] = 1
+        weights[1] = mw
 
     if curve == 'spline':
         spl = fit(curve, depth, ρ, weights=weights, doplot=doplot, k=2)
@@ -658,21 +656,19 @@ def CalN2(curve, ρ, depth, N2z, interp=False, doplot=False):
     else:
         while np.abs(Z) > Zthresh and num_try <= 7:
             weights[weights < 1] *= 10**(num_try)
-            if interp:
-                ddense = np.linspace(depth.min(), depth.max(), 10)
-                r = np.interp(ddense, depth, ρ)
-                [y0, Z, z0, y1] = fit(curve, ddense, r,
-                                      weights=weights,
-                                      doplot=doplot, maxfev=100000)
-            else:
-                [y0, Z, z0, y1] = fit(curve, depth[mask], ρ[mask],
-                                      weights=weights[mask],
-                                      doplot=doplot, maxfev=100000)
-
             num_try += 1
+            # if interp:
+            #     ddense = np.linspace(depth.min(), depth.max(), 10)
+            #     r = np.interp(ddense, depth[mask], ρ[mask])
+            #     [y0, Z, z0, y1] = fit(curve, ddense, r,
+            #                           weights, doplot=doplot, maxfev=100000)
+            # else:
+            [y0, Z, z0, y1] = fit(curve, depth[mask], ρ[mask],
+                                  weights[mask],
+                                  doplot=doplot, maxfev=100000)
 
-            if np.abs(Z) > Zthresh:
-                Z = np.nan
+        if np.abs(Z) > Zthresh:
+            Z = np.nan
 
         dρdz = y0/Z * (1 - np.tanh((N2z-z0)/Z)**2)
 
