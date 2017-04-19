@@ -598,30 +598,110 @@ def CalcGradients(rama):
     return (dSdz, dTdz, N2, p_ave)
 
 
-def CalN2(ρ, depth, N2z, interp=False, doplot=False):
+def N2fit(ρ, depth, depth0=None, curve='tanh', doplot=False, interp=False):
+    '''
+    Determine N² by fitting curve to ρ profile.
+
+    Input:
+        ρ = fn.(depth, time)
+        depth = depth vector
+        depth0 = Depth at which you want N²
+                 if None, return all depths
+        curve = tanh (default) / spline
+        doplot = if True, plot fit against data
+        interp = if True, interpolate to denser grid before fitting
+
+    Output:
+        N2 = fn.(time)
+        N2z = depth grid for N2 '''
+
+    import numpy as np
+
+    if depth0 is None:
+        depth0 = depth
+
+    N2z = np.asarray(depth0)
+
+    if ρ.ndim > 1:
+        ntime = ρ.shape[1]
+    else:
+        ntime = 1
+
+    # N2 = np.zeros((ntime,))
+
+    if ntime >= 1000:
+        from joblib import Parallel, delayed
+
+        N2 = Parallel(n_jobs=-1)(
+            delayed(CalN2)(curve, ρ[:, tt], depth, N2z, interp)
+            for tt in np.arange(ρ.shape[1]))
+    else:
+        if ntime == 1:
+            N2 = CalN2(curve, ρ, depth, N2z, doplot=doplot)
+            if doplot:
+                N2line = 9.81/1025*(ρ[2]-ρ[1])/(depth[2] - depth[1])
+                import matplotlib.pyplot as plt
+                plt.title('N2fit = ' + "{:1.3e}".format(N2)
+                          + ' | N2line = ' + "{:1.3e}".format(N2line))
+        else:
+            N2 = np.apply_along_axis(CalN2, 0, curve, ρ, depth,
+                                     N2z, interp=False)
+
+    # if ntime < 1e1:
+    #     for tt in np.arange(ntime):
+    #         N2[tt] = CalN2(depth, ρ[:, tt], interp)
+    # else:
+    #     from joblib import Parallel, delayed
+    #     Parallel(n_jobs=4)(delayed(CalN2)(depth, rho, interp)
+    #                        for rho in )
+
+    return [np.array(N2), N2z]
+
+
+def CalN2(curve, ρ, depth, N2z, interp=False, doplot=False):
     ''' Used for parallel call from N2Tanh below. '''
     from dcpy.fits import fit
     import numpy as np
 
     mask = np.isfinite(ρ)
-    mw = 3  # max weight
-    weights = 1/np.array([1, mw, mw, 1, 1, 1])
+    mw = 2  # max weight
+    weights = 1/np.array([1, 1e-1, mw, 1, 1e-2, 1])
 
-    if np.sum(mask) < 4:
-        # less than 4 valid points
+    if np.sum(mask) < 3:
+        # less than 3 valid points
         return np.nan
 
-    if interp:
-        ddense = np.linspace(depth.min(), depth.max(), 10)
-        r = np.interp(ddense, depth, ρ)
-        [y0, Z, z0, y1] = fit('tanh', ddense, r, doplot,
-                              sigma=weights, maxfev=100000)
+    num_try = 0
+    Z = 1e4
+    Zthresh = 1000
+
+    if mask[0] is False:
+        # surface sensor has failed. need to use 10m sensor
+        weights[1] = 1
+
+    if curve == 'spline':
+        spl = fit(curve, depth, ρ, weights=weights, doplot=doplot, k=2)
+        dρdz = spl.derivative(1)(N2z)
+
     else:
-        [y0, Z, z0, y1] = fit('tanh', depth[mask], ρ[mask], doplot,
-                              sigma=weights[mask], maxfev=100000)
+        while np.abs(Z) > Zthresh and num_try <= 7:
+            weights[weights < 1] *= 10**(num_try)
+            if interp:
+                ddense = np.linspace(depth.min(), depth.max(), 10)
+                r = np.interp(ddense, depth, ρ)
+                [y0, Z, z0, y1] = fit(curve, ddense, r,
+                                      weights=weights,
+                                      doplot=doplot, maxfev=100000)
+            else:
+                [y0, Z, z0, y1] = fit(curve, depth[mask], ρ[mask],
+                                      weights=weights[mask],
+                                      doplot=doplot, maxfev=100000)
 
-    if np.abs(Z) > 1e3:
-        Z = np.nan
+            num_try += 1
 
-    return 9.81/1025 * y0/Z * (1 - np.tanh((N2z-z0)/Z)**2)
+            if np.abs(Z) > Zthresh:
+                Z = np.nan
 
+        dρdz = y0/Z * (1 - np.tanh((N2z-z0)/Z)**2)
+
+    return 9.81/1025 * dρdz
