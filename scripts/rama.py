@@ -663,16 +663,25 @@ def CalN2(ρ, depth, N2z, tt, curve='tanh', interp=False, doplot=False):
             #     [y0, Z, z0, y1] = fit(curve, ddense, r,
             #                           weights, doplot=doplot, maxfev=100000)
             # else:
-            [y0, Z, z0, y1] = fit(curve, depth[mask], ρ[mask],
-                                  weights[mask],
-                                  doplot=doplot, maxfev=100000)
+            try:
+                [y0, Z, z0, y1] = fit(curve, depth[mask], ρ[mask],
+                                      weights[mask],
+                                      doplot=doplot, maxfev=100000)
+            except RuntimeError:
+                # fit did not work
+                [y0, Z, z0] = [np.nan, np.nan, np.nan]
 
         if np.abs(Z) > Zthresh:
             Z = np.nan
 
         dρdz = y0/Z * (1 - np.tanh((N2z-z0)/Z)**2)
 
-    return 9.81/1025 * dρdz
+    # if provided with density return N²
+    # else just return gradient (probably provided with salinity)
+    if np.all(ρ > 200):
+        return 9.81/1025 * dρdz
+    else:
+        return dρdz
 
 
 def TabulateNegativeN2(p_ave, N2, dSdz, dTdz):
