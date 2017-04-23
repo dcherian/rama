@@ -690,3 +690,18 @@ def TabulateNegativeN2(p_ave, N2, dSdz, dTdz):
     table[3].insert(0, '% dT/dz < 0')
 
     return table
+
+
+def TestFit(rama, tindices, var='densarr', curve='tanh'):
+
+    n = len(tindices)
+
+    zarr = rama['presarr'][:, 0]
+
+    for ii in range(1, n+1):
+        plt.subplot(n, 1, ii)
+        N2fit(rama[var], zarr, tt=tindices[ii-1],
+              depth0=15, doplot=True, curve=curve)
+
+    plt.tight_layout()
+    plt.show()
