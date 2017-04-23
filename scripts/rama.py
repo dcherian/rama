@@ -126,49 +126,39 @@ def ReadPrelimData(rama, fname):
                                                  minutes=mins)
         return date
 
+    def ReadFile(rama, var, fname, dtype, converters):
+        ''' Actually reads the text file. '''
+        ramapre = np.loadtxt('../TAO_raw/' + var + fname + 'a.flg',
+                             skiprows=5, dtype=dtype, converters=converters)
+        rama[var + '-pre'] = ramapre[var]
+        rama['date'] = ramapre['date']
+        try:
+            ramapost = np.loadtxt('../TAO_raw/postcal/sal' + fname + 'a.flg',
+                                  skiprows=5, dtype=dtype,
+                                  converters=converters)
+            rama[var + '-post'] = ramapost[var]
+        except FileNotFoundError:
+            rama[var + '-post'] = rama[var + '-pre']
+
     [sal, cond, temp, dens] = DefineDataTypes()
     window_len = 13
 
-    # ############ salinity
     cnv = {0: ProcessDate}
     for jj in np.arange(1, 7):
         cnv[jj] = Clean
 
-    ramapre = np.loadtxt('../TAO_raw/sal' + fname + 'a.flg',
-                         skiprows=5, dtype=sal, converters=cnv)
-    rama['sal-pre'] = ramapre['sal']
-    ramapost = np.loadtxt('../TAO_raw/postcal/sal' + fname + 'a.flg',
-                          skiprows=5, dtype=sal, converters=cnv)
-    rama['sal-post'] = ramapost['sal']
+    ReadFile(rama, 'sal', fname, sal, cnv)
+    ReadFile(rama, 'cond', fname, cond, cnv)
+    ReadFile(rama, 'dens', fname, dens, cnv)
 
-    rama['date'] = ramapre['date']
-    rama['hr-time'] = rama['date'][0::window_len/2]
-
-    # ############# conductivity
-    ramapre = np.loadtxt('../TAO_raw/cond' + fname + 'a.flg',
-                         skiprows=5, dtype=cond, converters=cnv)
-    rama['cond-pre'] = ramapre['cond']
-    ramapost = np.loadtxt('../TAO_raw/postcal/cond' + fname + 'a.flg',
-                          skiprows=5, dtype=cond, converters=cnv)
-    rama['cond-post'] = ramapost['cond']
-
-    # ############# density
-    ramapre = np.loadtxt('../TAO_raw/dens' + fname + 'a.flg',
-                         skiprows=5, dtype=dens, converters=cnv)
-    rama['dens-pre'] = ramapre['dens']
-
-    ramapost = np.loadtxt('../TAO_raw/postcal/dens' + fname + 'a.flg',
-                          skiprows=5, dtype=dens, converters=cnv)
-    rama['dens-post'] = ramapost['dens']
-
-    # ############ temperature
     for jj in np.arange(1, 14):
         cnv[jj] = Clean
-    ramapre = np.loadtxt('../TAO_raw/temp' + fname + 'a.flg',
-                         skiprows=5, dtype=temp, converters=cnv)
+    ReadFile(rama, 'temp', fname, temp, cnv)
+
+    rama['hr-time'] = rama['date'][0::window_len/2]
 
     # ########### Interpolate and convert to dictionaries
-    Ntime = len(ramapre['date'])
+    Ntime = len(rama['date'])
 
     weight_pre = np.arange(Ntime-1, -1, -1) / (Ntime-1)
     weight_post = np.arange(0, Ntime) / (Ntime-1)
@@ -176,7 +166,7 @@ def ReadPrelimData(rama, fname):
     for depth in rama['sal-pre'].dtype.names:
         rama['dens-pre'][depth] = rama['dens-pre'][depth] + 1000
         rama['dens-post'][depth] = rama['dens-post'][depth] + 1000
-        rama['temp'][depth] = smooth(ramapre['temp'][depth], window_len)
+        rama['temp'][depth] = smooth(rama['temp-pre'][depth], window_len)
 
         # pre to post-cal interpolation
         rama['cond'][depth] = smooth(weight_pre * rama['cond-pre'][depth]
