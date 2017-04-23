@@ -705,3 +705,40 @@ def TestFit(rama, tindices, var='densarr', curve='tanh'):
 
     plt.tight_layout()
     plt.show()
+
+
+def CompareFit(rama, var='N2fit', tind=None):
+
+    if var == 'N2fit':
+        _, _, grad, _ = CalcGradients(rama)
+    else:
+        # assume dSdz
+        grad, _, _, _ = CalcGradients(rama)
+
+    if tind is None:
+        tind = range(0, np.max(rama[var].shape))
+
+    plt.subplot(211)
+    plt.plot_date(rama['date'], grad[1, :]*1e4,
+                  '-', linewidth=1, alpha=0.7)
+    plt.plot_date(rama['date'][tind],
+                  smooth(rama[var][:, 0]*1e4, window_len=7),
+                  '-', linewidth=1, alpha=0.6)
+    plt.axhline(0, color='gray', zorder=-1)
+    plt.legend(('diff', 'fit'))
+    plt.ylabel('N² x 1e-4')
+    plt.title('15 m')
+
+    plt.subplot(212)
+    plt.plot_date(rama['date'], grad[2, :]*1e4,
+                  '-', linewidth=1, alpha=0.7)
+    plt.plot_date(rama['date'][tind],
+                  smooth(rama[var][:, 1]*1e4, window_len=7),
+                  '-', linewidth=1, alpha=0.6)
+    plt.axhline(0, color='gray', zorder=-1)
+    plt.legend(('diff', 'fit'))
+    plt.ylim([-1, 17])
+    plt.ylabel('N² x 1e-4')
+    plt.title('30 m')
+
+    plt.show()
