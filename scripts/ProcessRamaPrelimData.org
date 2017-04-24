@@ -497,29 +497,7 @@ Spline fits don't work well.
   import rama
   rama = importlib.reload(rama)
 
-  _, _, N2ρ, _ = rama.CalcGradients(ra107)
-
-  plt.clf()
-  plt.subplot(211)
-  plt.plot_date(ra107['date'], N2ρ[1, :]*1e4, '-', linewidth=1, alpha=0.7)
-  plt.plot_date(ra107['date'][0::1],
-		rama.smooth(ra107['N2fit'][:, 0]*1e4, window_len=7), '-', linewidth=1, alpha=0.6)
-  plt.axhline(0, color='gray', zorder=-1)
-  plt.legend(('diff', 'fit'))
-  plt.ylabel('N² x 1e-4')
-  plt.title('15 m')
-
-  plt.subplot(212)
-  plt.plot_date(ra107['date'], N2ρ[2, :]*1e4, '-', linewidth=1, alpha=0.7)
-  plt.plot_date(ra107['date'][0::1],
-		smooth(ra107['N2fit'][:, 1]*1e4, window_len=7), '-', linewidth=1, alpha=0.6)
-  plt.axhline(0, color='gray', zorder=-1)
-  plt.legend(('diff', 'fit'))
-  plt.ylim([-1, 17])
-  plt.ylabel('N² x 1e-4')
-  plt.title('30 m')
-
-  plt.show()
+  CompareFit(ra107)
 #+END_SRC
 
 #+CAPTION: Hourly smoothed N² fit.
@@ -537,54 +515,60 @@ Spline fits don't work well.
 * RAMA14 (ra-122)
 ** Read data
 #+BEGIN_SRC ipython :session :tangle yes :eval never-export :exports results
-  ra122read = np.loadtxt('../TAO_raw/sal122a.flg', skiprows=5, dtype=sal,
-			 converters={0:ProcessDate,
-			             1:Clean,
-			             2:Clean,
-			             3:Clean,
-			             4:Clean,
-			             5:Clean,
-			             6:Clean})
+  rama = importlib.reload(rama)
 
-  ra122 = dict([])
-  ra122['date'] = ra122read['date']
-  ra122['name'] = 'RAMA14'
+  ra122 = rama.Initialize('RAMA14', '122')
 
-  ra122['sal'] = dict([])
-  for depth in ra122read['sal'].dtype.names:
-      ra122['sal'][depth] = ra122read['sal'][depth]
+  # ra122read = np.loadtxt('../TAO_raw/sal122a.flg', skiprows=5, dtype=sal,
+  # 		       converters={0:ProcessDate,
+  # 			           1:Clean,
+  # 			           2:Clean,
+  # 			           3:Clean,
+  # 			           4:Clean,
+  # 			           5:Clean,
+  # 			           6:Clean})
 
-  var = 'temp'
-  ra122read = np.loadtxt('../TAO_raw/temp122a.flg', skiprows=5, dtype=temp,
-			 converters={0:ProcessDate,
-			             1:Clean,
-			             2:Clean,
-			             3:Clean,
-			             4:Clean,
-			             5:Clean,
-			             6:Clean})
-  ra122[var] = dict([])
-  for depth in ra122read[var].dtype.names:
-      ra122[var][depth] = ra122read[var][depth]
+  # ra122 = dict([])
+  # ra122['date'] = ra122read['date']
+  # ra122['name'] = 'RAMA14'
 
-  var = 'dens'
-  ra122read = np.loadtxt('../TAO_raw/dens122a.flg', skiprows=5, dtype=dens,
-			 converters={0:ProcessDate,
-			             1:Clean,
-			             2:Clean,
-			             3:Clean,
-			             4:Clean,
-			             5:Clean,
-			             6:Clean})
-  ra122[var] = dict([])
-  for depth in ra122read[var].dtype.names:
-      ra122[var][depth] = ra122read[var][depth] + 1000
+  # ra122['sal'] = dict([])
+  # for depth in ra122read['sal'].dtype.names:
+  #     ra122['sal'][depth] = ra122read['sal'][depth]
+
+  # var = 'temp'
+  # ra122read = np.loadtxt('../TAO_raw/temp122a.flg', skiprows=5, dtype=temp,
+  # 		       converters={0:ProcessDate,
+  # 			           1:Clean,
+  # 			           2:Clean,
+  # 			           3:Clean,
+  # 			           4:Clean,
+  # 			           5:Clean,
+  # 			           6:Clean})
+  # ra122[var] = dict([])
+  # for depth in ra122read[var].dtype.names:
+  #     ra122[var][depth] = ra122read[var][depth]
+
+  # var = 'dens'
+  # ra122read = np.loadtxt('../TAO_raw/dens122a.flg', skiprows=5, dtype=dens,
+  # 		       converters={0:ProcessDate,
+  # 			           1:Clean,
+  # 			           2:Clean,
+  # 			           3:Clean,
+  # 			           4:Clean,
+  # 			           5:Clean,
+  # 			           6:Clean})
+  # ra122[var] = dict([])
+  # for depth in ra122read[var].dtype.names:
+  #     ra122[var][depth] = ra122read[var][depth] + 1000
 
 
-  ReadDailyData(ra122)
+  # ReadDailyData(ra122)
 #+END_SRC
 
 #+RESULTS:
+
+New version
 ** Property plots
 #+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/rama14-T-S-ρ.png
   PcolorAll(ra122, ylim=[-50, 0])
@@ -624,6 +608,59 @@ Compare10mDyDiff(ra122, 'dens', '')
 
 #+RESULTS:
 [[file:images/RAMA14-dens-diff.png]]
+
+** Fit tanh
+ #+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/rama14-ρ-fit.png
+
+   import rama
+   rama = importlib.reload(rama)
+   rama.MakeArrays(ra122)
+   try:
+      dcpy.fits = importlib.reload(dcpy.fits)
+   except:
+      pass
+
+   rama.TestFit(ra122, tindices=[34298, 24400, 7001*6], depth0=30)
+#+END_SRC
+
+#+RESULTS:
+[[file:images/rama14-ρ-fit.png]]
+
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export
+  # do the calculation
+  rama = importlib.reload(rama)
+
+  # N²
+  %time N2, N2z = rama.N2fit(ra122['densarr'][:, 0::1], ra122['presarr'][:, 0], name=ra122['name'], depth0=[15, 30])
+
+  ra122['N2fit'] = N2
+  ra122['N2z'] = N2z
+
+  # dSdz
+  #dSdz, Sz_z = rama.N2fit(ra107['salarr'][:, 0::2], ra107['presarr'][:, 0], depth0=[15, 30])
+#+END_SRC
+
+#+RESULTS:
+
+
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/ra122-compare-fit.png
+  rama = importlib.reload(rama)
+
+  rama.CompareFit(ra122)
+  plt.show()
+#+END_SRC
+
+#+CAPTION: This doesn't seem to do well at 15m. But 30m should be usable.
+#+RESULTS:
+[[file:images/ra122-compare-fit.png]]
+
+** Save
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export
+  rama = importlib.reload(rama)
+  rama.SaveRama(ra122)
+#+END_SRC
+
+#+RESULTS:
 
 * RAMA13 & RAMA14
 ** Property plots

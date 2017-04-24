@@ -560,13 +560,14 @@ def CalcGradients(rama):
     return (dSdz, dTdz, N2, p_ave)
 
 
-def N2fit(ρ, depth, depth0=None, curve='tanh', doplot=False,
+def N2fit(ρ, depth, name, depth0=None, curve='tanh', doplot=False,
           interp=False, tt=None):
     ''' Determine N² by fitting curve to ρ profile.
 
     Input:
         ρ = fn.(depth, time)
         depth = depth vector
+        name = name of record, so that appropriate weights are chosen3``
         depth0 = Depth at which you want N²
                  if None, return all depths
         curve = tanh (default) / spline
@@ -592,24 +593,26 @@ def N2fit(ρ, depth, depth0=None, curve='tanh', doplot=False,
         ntime = 1
 
     if ntime == 1:
-        N2 = CalN2(ρ[:, tt], depth, N2z, tt=tt, curve=curve, doplot=doplot)
+        N2 = CalN2(ρ[:, tt], depth, name, N2z,
+                   tt=tt, curve=curve, doplot=doplot)
         if doplot:
-            N2line = 9.81/1025*(ρ[2, tt]-ρ[1, tt])/(depth[2] - depth[1])
+            N2line = 9.81/1025*(ρ[3, tt]-ρ[2, tt])/(depth[3] - depth[2])
             import matplotlib.pyplot as plt
-            plt.title('N2fit = ' + "{:1.3e}".format(N2)
-                      + ' | N2line = ' + "{:1.3e}".format(N2line))
+            plt.title(str(tt) + ' | N2fit = ' + "{:1.3e}".format(N2)
+                      + ' | N2line 30 = ' + "{:1.3e}".format(N2line))
 
     else:
         from joblib import Parallel, delayed
 
-        N2 = Parallel(n_jobs=-1)(delayed(CalN2)(ρ[:, t], depth, N2z, t, curve)
+        N2 = Parallel(n_jobs=-1)(delayed(CalN2)(ρ[:, t], depth, name,
+                                                N2z, t, curve)
                                  for t in np.arange(ntime))
 
     return [np.array(N2), N2z]
 
 
-def CalN2(ρ, depth, N2z, tt, curve='tanh', interp=False, doplot=False):
-    ''' Used for parallel call from N2Tanh below. '''
+def CalN2(ρ, depth, name, N2z, tt, curve='tanh', interp=False, doplot=False):
+    ''' Used for parallel call from N2Tanh above. '''
     from dcpy.fits import fit
     import numpy as np
 
@@ -619,25 +622,32 @@ def CalN2(ρ, depth, N2z, tt, curve='tanh', interp=False, doplot=False):
         return np.nan
 
     mw = 2  # max weight
-    weights = np.array([1, 1e-1, mw, 1, 1e-1, 1e-4])
 
-    # accounts for summer peak in N²
-    if tt < 22430 and tt > 18700:
-        weights[1] = mw+2
-        weights[2] = mw+2
-        weights[-2] = 1
-    else:
-        if tt > 40000:
+    if name == 'RAMA13':
+        weights = np.array([1, 1e-1, mw, 1, 1e-1, 1e-4])
+        # accounts for summer peak in N²
+        if tt < 22430 and tt > 18700:
+            weights[1] = mw+2
+            weights[2] = mw+2
+            weights[-2] = 1
+        else:
+            if tt > 40000:
+                weights[1] = mw
+                weights[-1] = 1
+
+        if mask[0] is False and weights[1] < 1:
+            # surface sensor has failed. need to use 10m sensor
             weights[1] = mw
-            weights[-1] = 1
+
+    if name == 'RAMA14':
+        weights = np.array([1e-4, 1,  1, mw, 1e-1, 1])
+        if tt > 31000 and tt < 39000:
+            weights[2] = 1e-1
+            weights[1] = 1e-1
 
     num_try = 0
     Z = 1e4
     Zthresh = 1000
-
-    if mask[0] is False and weights[1] < 1:
-        # surface sensor has failed. need to use 10m sensor
-        weights[1] = mw
 
     if curve == 'spline':
         spl = fit(curve, depth, ρ, weights=weights, doplot=doplot, k=2)
@@ -692,7 +702,7 @@ def TabulateNegativeN2(p_ave, N2, dSdz, dTdz):
     return table
 
 
-def TestFit(rama, tindices, var='densarr', curve='tanh'):
+def TestFit(rama, tindices, depth0=15, var='densarr', curve='tanh'):
 
     n = len(tindices)
 
@@ -700,14 +710,15 @@ def TestFit(rama, tindices, var='densarr', curve='tanh'):
 
     for ii in range(1, n+1):
         plt.subplot(n, 1, ii)
-        N2fit(rama[var], zarr, tt=tindices[ii-1],
-              depth0=15, doplot=True, curve=curve)
+        N2fit(rama[var], zarr, name=rama['name'], tt=tindices[ii-1],
+              depth0=depth0, doplot=True, curve=curve)
+        plt.axvline(depth0, color='gray', zorder=-1)
 
     plt.tight_layout()
     plt.show()
 
 
-def CompareFit(rama, var='N2fit', tind=None):
+def CompareFit(rama, var='N2fit'):
 
     if var == 'N2fit':
         _, _, grad, _ = CalcGradients(rama)
@@ -715,8 +726,9 @@ def CompareFit(rama, var='N2fit', tind=None):
         # assume dSdz
         grad, _, _, _ = CalcGradients(rama)
 
-    if tind is None:
-        tind = range(0, np.max(rama[var].shape))
+    import numpy as np
+    n = int(np.ceil(rama['date'].shape[0]/rama['N2fit'].shape[0]))
+    tind = range(0, np.max(rama['date'].shape), n)
 
     plt.subplot(211)
     plt.plot_date(rama['date'], grad[1, :]*1e4,
@@ -740,5 +752,3 @@ def CompareFit(rama, var='N2fit', tind=None):
     plt.ylim([-1, 17])
     plt.ylabel('N² x 1e-4')
     plt.title('30 m')
-
-    plt.show()
