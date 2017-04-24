@@ -1,0 +1,450 @@
+#+TITLE: RAMA: χ estimates
+#+AUTHOR: Deepak Cherian
+#+DATE: 14 Mar 2017
+
+#+OPTIONS: html-link-use-abs-url:nil html-postamble:auto
+#+OPTIONS: html-preamble:t html-scripts:nil html-style:nil
+#+OPTIONS: html5-fancy:t tex:t
+#+HTML_DOCTYPE: html5
+#+HTML_CONTAINER: div
+#+LATEX_CLASS: dcnotebook
+#+HTML_HEAD: <link rel="stylesheet" href="notebook.css" type="text/css" />
+#+PROPERTY: header-args :eval never-export :tangle yes
+
+* generic :noexport:
+#+BEGIN_SRC ipython :session :exports results
+  %matplotlib inline
+  import numpy as np
+  import matplotlib as mpl
+  import matplotlib.pyplot as plt
+  import datetime as dt
+  import bottleneck as bn
+  import h5py
+  import sys
+
+  sys.path.append('/home/deepak/python')
+  import dcpy.plots
+  import dcpy.util
+  import chipy.chipy as chipy
+  import importlib
+  dcpy = importlib.reload(dcpy)
+
+  mpl.rcParams['savefig.transparent'] = True
+  mpl.rcParams['figure.figsize'] = [6.5, 6.5]
+  mpl.rcParams['figure.dpi'] = 180
+  mpl.rcParams['axes.facecolor'] = 'None'
+  # del c526
+  # c526mar = chipy.chipod('../RAMA13/data/', '526', 'first-try')
+#+END_SRC
+
+#+RESULTS:
+* Map
+#+CAPTION: χpod locations for ASIRI/EBOB/MesoBOB
+[[file:~/ebob/MixingmapASIRIPiston.png]]
+
+* what χ estimates are independent?
+~T1~, ~T2~ are independent measures of the "same thing."
+
+internal ∂T/∂z and mooring Tz are independent measures of the temperature stratification
+
+for *526*: always mooring velocity, mooring N²
+- ~mm1~
+- ~mm2~
+- ~mi11~
+- ~mi22~
+
+for *527*: always pitot velocity, mooring N²
+- ~pm1~
+- ~pm2~
+- ~pi11~
+- ~pi22~
+
+Can I choose between mooring and internal dT/dz? They are /independent/ measures of ∂T/∂z
+ - But you have to worry about which one is more appropriate especially when salinity is so important.
+
+* RAMA13 (ra-107)
+|------------+------------+-----------------+----------------+------+---------|
+| Section    | Dir        | Vel             | S              | Tz   | Compass |
+|------------+------------+-----------------+----------------+------+---------|
+| [[first try]]  | [[file:RAMA13/data/526/proc/first-try][first-try]]  | both            | daily          | both | ?       |
+| [[2017-04-07]] | [[file:RAMA13/data/526/proc/2017-04-07][2017-04-07]] | mooring         | 10m (pre-cal?) | off  | off     |
+|            | ---------- | changed masking | -------------- |      |         |
+| [[2017-04-12]] | [[file:~/rama/RAMA13/data/526/proc/2017-04-12][2017-04-12]] | mooring         | 10m (filt)     | both | off     |
+|            | ---------- | N² tanh fit     | -------------- |      |         |
+| [[2017-04-20]] |            | mooring         | N² fit         | both | off     |
+|------------+------------+-----------------+----------------+------+---------|
+
+Notes on above:
+- Unsure what salinity I used for 2017-04-07. The big difference between that and 2017-04-12 is the N² time series. N^2 drift screws up χ estimate
+
+- Very sure that 2017-04-12 used hourly filtered 10min salinity.
+
+** functions
+#+BEGIN_SRC ipython :session :exports results
+  def smooth(y, box_pts):
+      box = np.ones(box_pts)/box_pts
+      y_smooth = np.convolve(y, box, mode='same')
+      return y_smooth
+
+#+END_SRC
+
+#+RESULTS:
+** full moooring
+
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export
+
+import moor
+import importlib
+
+importlib.reload(moor)
+importlib.reload(chipy)
+
+ra12 = moor.moor(90, 12, 'RAMA13', '../RAMA13/')
+ra12.AddChipod(526, '2017-04-20.mat', 15, 'mm')
+ra12.AddChipod(527, '2017-04-20.mat', 30, 'pm')
+ra12.ReadMet('../RAMA13/rama_mooring_data/met12n90e_10m.cdf')
+#+END_SRC
+
+#+RESULTS:
+
+
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/temp/py12676fpi.png
+  importlib.reload(moor)
+  importlib.reload(chipy)
+
+  ra12.Plotχpods('KT')
+#+END_SRC
+
+#+RESULTS:
+[[file:images/temp/py12676fpi.png]]
+** χ-pod 526
+*** 2017-04-20
+This estimate uses the tanh fit to determine N².
+#+CAPTION: Tuned tanh fit used to determine N² compared against simple difference (~diff~)
+[[file:images/N2-fit-compare.png]]
+
+*K_T:* ~mm1~, ~mm2~ agree well; Similarly ~mi11~ and ~mi22~ agree well.
+
+But there's a bias when comparing ~mm1~ with ~mi11~.
+
+I wonder if I should really fit salinity gradient instead of the backwards method I'm using currently.
+
+Read data:
+#+BEGIN_SRC ipython :session :tangle yes :exports both :eval never-export
+
+  import chipy.chipy as chipy
+  import importlib
+  chipy = importlib.reload(chipy)
+
+  apr20 = chipy.chipod('../RAMA13/data/', '526', '2017-04-20.mat')
+  apr20.LoadChiEstimates()
+  apr20.LoadSallyChiEstimate('../sally/chi_analysis_bkgrnd_Feb5/deglitched/mean_chi_526.mat', 'sally')
+
+  apr20.CalcKT()
+
+#+END_SRC
+
+#+RESULTS:
+
+**** ~mm~ vs. ~mi~
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/temp/py121246SIh.png
+
+apr20.CompareEstimates('chi', 'mm', 'mi', filter_len=24*6)
+plt.show()
+#+END_SRC
+
+#+RESULTS:
+[[file:images/temp/py121246SIh.png]]
+
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/temp/py12672yD.png
+
+apr20.CompareEstimates('KT', 'mm', 'mi', filter_len=24*6)
+plt.subplot(2, 2, (1, 2))
+plt.grid(which='both')
+plt.show()
+#+END_SRC
+
+#+RESULTS:
+[[file:images/temp/py12672yD.png]]
+**** Compare with sally's estimate - looks fine.
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/temp/py12676SIh.png
+
+apr20.CompareEstimates('chi', 'mm1', 'sally1', filter_len=24*6)
+plt.show()
+#+END_SRC
+
+#+RESULTS:
+[[file:images/temp/py12676SIh.png]]
+
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/temp/py12676AyD.png
+
+apr20.CompareEstimates('KT', 'mm', 'sally1', filter_len=24*6)
+#+END_SRC
+
+#+RESULTS:
+[[file:images/temp/py12676AyD.png]]
+
+Let's compare sally's N² with mine.
+
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/temp/py12676vJw.png
+
+    plt.plot_date(apr20.time, apr20.chi['mm1']['N2'].squeeze(),
+		  '-', linewidth=1, alpha=0.6)
+    plt.plot_date(apr20.chi['sally1']['time'].squeeze(),
+		  apr20.chi['sally1']['N2'].squeeze(),
+                  '-', linewidth=1, alpha=0.6)
+    plt.legend('My N² (tanh fit)', 'sally N2')
+
+#+END_SRC
+#+CAPTION: Sally's N² has salinity drift.
+#+RESULTS:
+[[file:images/temp/py12676vJw.png]]
+
+*** 2017-04-12
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export
+
+import chipy.chipy as chipy
+
+apr07 = chipy.chipod('../RAMA13/data/', '526', '2017-04-07.mat')
+apr07.LoadChiEstimates()
+apr07.CalcKT()
+
+apr12 = chipy.chipod('../RAMA13/data/', '526', '2017-04-12.mat')
+apr12.LoadChiEstimates()
+apr12.CalcKT()
+#+END_SRC
+
+#+RESULTS:
+
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/chi-mm1-apr07-apr12.png
+
+  window=None
+
+  plt.subplot(2, 1, 1)
+  apr07.PlotEstimate('chi', 'mm1', filter_len=window);
+  apr12.PlotEstimate('chi', 'mm1', filter_len=window);
+
+  plt.subplot(2, 1, 2)
+  lv1 = np.log10(apr07.chi['mm1']['chi'])
+  lv2 = np.log10(apr12.chi['mm1']['chi'])
+
+  plt.hist(lv1[np.isfinite(lv1)], bins=40, normed=True, alpha=0.5)
+  plt.hist(lv2[np.isfinite(lv2)], bins=40, normed=True, alpha=0.5)
+  plt.legend(('apr07', 'apr12'))
+  plt.show()
+
+#+END_SRC
+#+CAPTION: These χ's are an order of magnitude higher than [[2017-04-07]] because of drift in N²
+#+RESULTS:
+[[file:images/chi-mm1-apr07-apr12.png]]
+
+Using mooring dT/dz to mask χ masks out 2.7% of estimates
+Using internal dT/dz to mask χ masks out 7% of estimates
+Using speed < 5cm/s masks out 0.35% estimates
+
+*masking does not change much at all*
+
+The difference is N² but why is χ higher for higher N^2?
+\[ k_b ∝ ε_χ ∝ N^2 \]
+
+
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/temp/py12676_n2.png
+
+  plt.plot_date(apr07.chi['mm1']['time'], apr07.chi['mm1']['N2'],
+		'-', linewidth=1)
+  plt.plot_date(apr12.chi['mm1']['time'], apr12.chi['mm1']['N2'],
+		'-', linewidth=1)
+  plt.ylabel('N²')
+  plt.legend('Apr 07', 'Apr 12')
+  plt.show()
+#+END_SRC
+
+#+RESULTS:
+[[file:images/temp/py12676_n2.png]]
+
+#+CAPTION: For Apr07 estimate, use_TS_slope = 1 i.e. using Johannes' method of fitting T-S slope. For Apr12, I was doing the simple difference.
+[[file:images/526-apr7-apr12-N2.png]]
+*** 2017-04-07
+ | 10-min *unfiltered*  salinity | mooring dT/dz |
+
+#+BEGIN_SRC ipython :session :exports results
+  c526 = chipy.chipod('../RAMA13/data/', '526', '2017-04-07')
+  c526.LoadChiEstimates()
+  c526.LoadSallyChiEstimate('../sally/chi_analysis_bkgrnd_Feb5/deglitched/mean_chi_526.mat', 'sally')
+
+  c526.CalcKT()
+
+#+END_SRC
+
+#+RESULTS:
+**** test filtering
+#+BEGIN_SRC ipython :session  :exports results :file images/temp/py172156XN.png
+
+  w, h = mpl.figure.figaspect(1/1.618)
+  plt.figure(figsize=(w,h))
+  c526.PlotEstimate('KT', 'mm1')
+  c526.PlotEstimate('KT', 'mm1', filter_len=24*60+1)
+#+END_SRC
+
+#+RESULTS:
+[[file:images/temp/py172156XN.png]]
+
+**** scatter χ vs. velocity
+
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/chi-velocity-526.png
+
+
+#+END_SRC
+**** ~mm1~ vs. sally
+
+Seems to agree fine. My estimates tend to be noisier; this is probably because of salinity spiking --- this estimate uses unfiltered 10-min salinity.
+#+BEGIN_SRC ipython :session :tangle yes :exports results  :file images/chi-526-prelimsal-mm1-sally.png
+  w, h = mpl.figure.figaspect(1/1.618)
+  plt.figure(figsize=(w,h))
+  c526.PlotEstimate('KT', 'mm1', filter_len=24*60+1)
+  c526.PlotEstimate('KT', 'sally', filter_len=24*60+1)
+
+#+END_SRC
+
+#+RESULTS:
+[[file:images/chi-526-prelimsal-mm1-sally.png]]
+**** ~mm1~ vs. ~mm2~
+#+BEGIN_SRC ipython :session :tangle yes :exports results  :file images/chi-526-prelimsal-mm1-mm2.png
+  c526.CompareEstimates('chi', 'mm1', 'mm2', filter_len=24*60+1)
+#+END_SRC
+
+#+RESULTS:
+[[file:images/chi-526-prelimsal-mm1-mm2.png]]
+
+**** Sally T1 vs. T2
+#+BEGIN_SRC ipython :session :tangle yes :exports results  :file images/chi-526-sally-mm1-mm2.png
+c526.CompareEstimates('chi', 'sally1', 'sally2', filter_len=5*24*6+1)
+#+END_SRC
+
+#+RESULTS:
+[[file:images/chi-526-sally-mm1-mm2.png]]
+
+**** Distributions
+
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/temp/py12676O0V.png
+
+chi = c526.chi['mm1']['chi'][:].squeeze()
+
+
+#+END_SRC
+*** first try
+**** ~mm1~ and ~mi11~ agree really well.
+#+BEGIN_SRC ipython :session   :exports results :file images/RAMA13-chi-compare-526-mm1-mi11.png
+  c526.CompareEstimates('chi', 'mm1', 'mi11')
+#+END_SRC
+
+#+RESULTS:
+[[file:images/RAMA13-chi-compare-526-mm1-mi11.png]]
+
+#+BEGIN_SRC ipython :session :exports results :file images/RAMA13-KT-compare-mm1-mi11.png
+c526.CompareEstimates('KT', 'mm1', 'mi11')
+#+END_SRC
+
+#+RESULTS:
+[[file:images/RAMA13-KT-compare-mm1-mi11.png]]
+
+**** ~mi11~ and ~mi22~ disagree quite a lot!
+#+BEGIN_SRC ipython :session   :exports results :file images/RAMA13-chi-compare-526-mi11-mi22.png
+
+c526.CompareEstimates('chi', 'mi11', 'mi22')
+
+#+END_SRC
+
+#+RESULTS:
+[[file:images/RAMA13-chi-compare-526-mi11-mi22.png]]
+#+BEGIN_SRC ipython :session :exports results :file images/RAMA13-kt-compare-526-mi11-mi22.png
+
+c526.CompareEstimates('KT', 'mi11', 'mi22')
+
+#+END_SRC
+
+#+RESULTS:
+[[file:images/RAMA13-kt-compare-526-mi11-mi22.png]]
+
+**** ~mi11~ and ~pi11~ agree well - but pitot voltage drifts!
+This is with the 40-day high pass filtered pitot but I forgot to add back the 40-day mean.
+
+#+BEGIN_SRC ipython :session   :exports results :file images/RAMA13-chi-compare-526-mi11-pi11.png
+
+c526.CompareEstimates('chi', 'mi11', 'pi11', filter_len=24*60)
+
+#+END_SRC
+
+#+RESULTS:
+[[file:images/RAMA13-chi-compare-526-mi11-pi11.png]]
+
+#+BEGIN_SRC ipython :session :exports results :file images/RAMA13-kt-compare-526-mi11-pi11.png
+
+c526.CompareEstimates('KT', 'mi11', 'pi11', filter_len=24*60)
+
+#+END_SRC
+
+#+RESULTS:
+[[file:images/RAMA13-kt-compare-526-mi11-pi11.png]]
+
+**** masking
+
+#+BEGIN_SRC ipython :session :exports results :file images/temp/py172156XN.png
+
+  chi = c526.chi['mi11']
+  N2 = chi['N2'][:].squeeze()
+  Tz = chi['dTdz'][:].squeeze()
+  c = chi['chi'][:].squeeze()
+
+  c[Tz < -0.5] = np.nan
+  c[N2 > 1] = np.nan
+  plt.plot(c)
+  plt.yscale('log')
+
+  import scipy.ndimage as image
+
+  def dcmedianfilter(a):
+    return np.nanmedian(a)
+
+  # cfilt = image.generic_filter1d(c, dcmedianfilter, 10)
+  cfilt = image.median_filter(c, 5*24*60)
+  plt.plot(c, '-')
+  plt.plot(cfilt, '-')
+  plt.yscale('log')
+#+END_SRC
+
+#+RESULTS:
+[[file:images/temp/py172156XN.png]]
+** χ-pod 527
+
+Pitot tube dies in June (;´༎ຶД༎ຶ`)
+
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export
+
+  import chipy.chipy as chipy
+  import importlib
+  chipy = importlib.reload(chipy)
+
+  c527 = chipy.chipod('../RAMA13/data/', '527', '2017-04-20.mat')
+#+END_SRC
+
+#+RESULTS:
+
+
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/temp/py12676zpc.png
+
+c527.CompareEstimates('chi', 'pm1', 'pm2', filter_len=24*6)
+#+END_SRC
+
+#+RESULTS:
+[[file:images/temp/py12676zpc.png]]
+
+
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/temp/py12676aIv.png
+c527.CompareEstimates('KT', 'pm1', 'pm2', filter_len=24*6)
+#+END_SRC
+
+#+RESULTS:
+[[file:images/temp/py12676aIv.png]]
+
+* RAMA14 (ra-122)
