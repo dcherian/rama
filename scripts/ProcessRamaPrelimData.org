@@ -375,7 +375,7 @@ Quality flag = 2 = default quality; Pre-deployment calibrations applied.  Defaul
 
 Looks like they depend on the Hanning filter to deal with spiking.
 
-#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/rama13-quality-dy.png
+#+BEGIN_SRC ipython :session :tangle yes :exports none :eval never-export :file images/rama13-quality-dy.png
 
   plt.subplot(211)
   plt.plot_date(ra107['dy-time'],
@@ -484,10 +484,14 @@ Spline fits don't work well.
   rama = importlib.reload(rama)
   dcpy.fits = importlib.reload(dcpy.fits)
 
-  %time N2, N2z = rama.N2fit(ra107['densarr'][:, 0::1], ra107['presarr'][:, 0], depth0=[15, 30])
+  # N²
+  # %time N2, N2z = rama.N2fit(ra107['densarr'][:, 0::1], ra107['presarr'][:, 0], depth0=[15, 30])
 
-  ra107['N2fit'][0::1, :] = N2
-  ra107['N2z'] = N2z
+  # ra107['N2fit'][0::1, :] = N2
+  # ra107['N2z'] = N2z
+
+  # dSdz
+  dSdz, Sz_z = rama.N2fit(ra107['salarr'][:, 0::2], ra107['presarr'][:, 0], depth0=[15, 30])
 #+END_SRC
 
 #+RESULTS:

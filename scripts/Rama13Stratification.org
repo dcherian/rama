@@ -1,77 +1,132 @@
-#+TITLE: Compare mooring & chipod dT/dz
+#+TITLE: Compare various stratification estimates
 #+AUTHOR: Deepak Cherian
 #+DATE: 02 Feb 2017
 
-* Load data + functions
+#+OPTIONS: html-link-use-abs-url:nil html-postamble:auto
+#+OPTIONS: html-preamble:t html-scripts:nil html-style:nil
+#+OPTIONS: html5-fancy:t tex:t
+#+HTML_DOCTYPE: html5
+#+HTML_CONTAINER: div
+#+LATEX_CLASS: dcnotebook
+#+HTML_HEAD: <link rel="stylesheet" href="notebook.css" type="text/css" />
 
-#+BEGIN_SRC ipython :session :exports both
-  %matplotlib inline
-  import numpy as np
-  import matplotlib as mpl
-  import matplotlib.pyplot as plt
-  import datetime as dt
-  import hdf5storage as hs
-  import seaborn as sns
-  from scipy.io import loadmat
+* Load data + functions :noexport:
 
-  mpl.rcParams['savefig.transparent'] = True
-  mpl.rcParams['figure.figsize'] = [6.5, 6.5]
-  mpl.rcParams['figure.dpi'] = 120
-  mpl.rcParams['axes.facecolor'] = 'None'
+#+BEGIN_SRC ipython :session :exports results :eval never-export
+      %matplotlib inline
+      import numpy as np
+      import matplotlib as mpl
+      import matplotlib.pyplot as plt
+      import datetime as dt
+      import hdf5storage as hs
+      from scipy.io import loadmat
 
-  fname = '../RAMA13/data/526/input/dTdz_i.mat'
+      import sys
+      sys.path.append('/home/deepak/python')
+      import dcpy.plots
+      import dcpy.util
 
-  mat = hs.loadmat('../RAMA13/data/526/input/dTdz_i.mat')
-  Tz_i = mat['Tz_i'];
-  Tzi = np.squeeze(Tz_i['Tz12'])
-  TziTime = np.squeeze(Tz_i['time'])
+      mpl.rcParams['savefig.transparent'] = True
+      mpl.rcParams['figure.figsize'] = [6.5, 6.5]
+      mpl.rcParams['figure.dpi'] = 120
+      mpl.rcParams['axes.facecolor'] = 'None'
 
-  mat = hs.loadmat('../RAMA13/data/526/input/dTdz_m.mat')
-  Tz_m = mat['Tz_m'];
-  Tzm = Tz_m['Tz'][0][0][0]
-  TzmTime = Tz_m['time'][0][0][0]
-  Szm = Tz_m['Sz'][0][0][0]
-  sTS = Tz_m['s_TS'][0][0][0]
+      mat = hs.loadmat('../RAMA13/data/526/input/dTdz_i.mat')
+      Tz_i = mat['Tz_i'];
+      Tzi = Tz_i['Tz12'][0,0].squeeze()
+      TziTime = Tz_i['time'][0,0].squeeze()
 
-  Tzi[abs(Tzi)>5] = np.nan
-  Tzm[abs(Tzm)>5] = np.nan
+      mat = hs.loadmat('../RAMA13/data/526/input/dTdz_m.mat')
+      Tz_m = mat['Tz_m'];
+      Tzm = Tz_m['Tz'][0,0].squeeze()
+      TzmTime = Tz_m['time'][0,0].squeeze()
+      #Szm = Tz_m['Sz'][0][0][0]
+      #sTS = Tz_m['s_TS'][0][0][0]
+
+      Tzi[abs(Tzi)>5] = np.nan
+      Tzm[abs(Tzm)>5] = np.nan
 #+END_SRC
 
 #+RESULTS:
 
-#+BEGIN_SRC ipython :session :exports both
-  def find_approx(vec, value):
-      ind = np.argmin(vec == value)
-      return ind
+#+RESULTS
 
-  def line45():
-      plt.axis('square')
-      plt.xlim(np.array([-1, 1])*np.max(np.abs(plt.xlim())))
-      plt.ylim(np.array([-1, 1])*np.max(np.abs(plt.ylim())))
-      plt.plot(plt.xlim(), plt.ylim(), color='gray')
-
+#+BEGIN_SRC ipython :session :exports results :eval never-export
   def ScatterSameTimeInterval(t1, v1, t2, v2, hax=None, guidelines=True):
       import matplotlib.pyplot as plt
       import numpy as np
+      import dcpy.plots
 
       v2interp = np.interp(t1, t2, v2)
 
       if ~(hax is None):
           hax = plt.gca()
 
-      plt.axes(hax)
-      hax.plot(v1, v2interp, '+');
+      plt.axes(hax);
+      hax.scatter(v1, v2interp, alpha=0.25, edgecolor='black', linewidth=0.15);
+      # hax.hexbin(v1, v2interp, cmap=plt.cm.YlOrRd, gridsize=100)
+      plt.xlabel('v1'); plt.ylabel('v2')
 
       if guidelines:
           plt.axhline(0, axes=hax, color='gray')
           plt.axvline(0, axes=hax, color='gray')
-          line45()
+          dcpy.plots.line45()
 #+END_SRC
 
 #+RESULTS:
+* N² from Tz_i and Tz_m
+
+Use filtered 10 minute salinity to create N² with Tz_i.
+
+Mooring "sees" a more stratified fluid in general.
+
+Lot more inversions in internally sensed N².
+
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export  :file images/N2-moor-internal.png
+
+  plt.subplot(121)
+  ScatterSameTimeInterval(TziTime, Tzi, TzmTime, Tzm)
+  plt.xlabel('Tz_i'); plt.ylabel('Tz_m')
+
+  plt.subplot(122)
+  ScatterSameTimeInterval(TziTime, Tz_i['N2_1'][0,0].squeeze(),
+                          TzmTime, Tz_m['N2'][0,0].squeeze())
+  plt.xlabel('N2_i'); plt.ylabel('N2_m');
+  plt.xlim(np.array([-1,1])*1e-3)
+  plt.ylim([-1e-4, 1.2e-3])
+
+  plt.tight_layout()
+#+END_SRC
+
+#+RESULTS:
+[[file:images/N2-moor-internal.png]]
+
+Let's see what the differences are during the cyclone.
+
+No difference - everything is being mixed.
+
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/526-hudhud-tzi-tzm.png
+
+ax1 = plt.subplot(211)
+plt.plot_date(TziTime-365, Tzi, '-', linewidth=1)
+plt.plot_date(TzmTime-365, Tzm, '-', linewidth=1)
+ax1.set_ylim([-0.05, 0.1])
+plt.axhline(0, color='gray', zorder=-100)
+
+ax2 = plt.subplot(212, sharex=ax1)
+plt.plot_date(TziTime-365, Tz_i['N2_1'][0,0].squeeze(), '-', linewidth=1)
+plt.plot_date(TzmTime-365, Tz_m['N2'][0,0].squeeze(), '-', linewidth=1)
+ax2.set_ylim([-1e-4, 5e-4])
+plt.axhline(0, color='gray', zorder=-100)
+
+ax1.set_xlim([dt.datetime(2014, 10, 1), dt.datetime(2014, 10, 15)])
+#+END_SRC
+
+#+RESULTS:
+[[file:images/526-hudhud-tzi-tzm.png]]
 
 * Compare dT/dz between mooring and chipod
-#+BEGIN_SRC ipython :session :file images/mooring-chipod-dTdz.png :exports both
+#+BEGIN_SRC ipython :session :file images/mooring-chipod-dTdz.png :exports results :eval never-export
   f, (ax1, ax2) = plt.subplots(1,2)
   plt.axes(ax1)
   ScatterSameTimeInterval(TzmTime, Tzm, TziTime, Tzi)
@@ -104,7 +159,7 @@ I am comparing T_z estimates from *mooring instruments*.
 
 Looks pretty good, I say!
 
-#+BEGIN_SRC ipython :session :file images/Tz-mooring-historical-RAMA13.png :exports both
+#+BEGIN_SRC ipython :session :file images/Tz-mooring-historical-RAMA13.png :exports results :eval never-export
 
   mat = loadmat('../processed/rama12n90e.mat', squeeze_me=True, struct_as_record=False)
 
@@ -118,9 +173,10 @@ Looks pretty good, I say!
 
   def dcHist(var, bins=100, **kwargs):
       import numpy as np
+      import seaborn as sns
       sns.set_style('darkgrid')
       mpl.rcParams['figure.facecolor'] = 'None'
-      #plt.hist(var[~np.isnan(var)], bins, **kwargs)
+      # plt.hist(var[~np.isnan(var)], bins, **kwargs)
       sns.distplot(var[~np.isnan(var)], bins, norm_hist=True, **kwargs)
 
   bins = np.linspace(-0.1, .3, num=100)
@@ -151,7 +207,7 @@ As Emily pointed out, I should probably get rid of the daily cycle.
 
 I think we should go further and look at high-frequency variability only. The rest is not really relevant for χ really.
 
-#+BEGIN_SRC ipython :session :file images/high-pass-filter-dTdz-dSdz.png :exports both
+#+BEGIN_SRC ipython :session :file images/high-pass-filter-dTdz-dSdz.png :exports results :eval never-export
 
   def FindSegments(input):
       '''
@@ -323,7 +379,7 @@ Temperature has *strong* daily peak. Needs really strict filtering.
 Salinity not so much.
 
 Step response
-#+BEGIN_SRC ipython :session :file images/temp/py49578oeU.png :exports both
+#+BEGIN_SRC ipython :session :file images/temp/py49578oeU.png :exports results
 def mfreqz(b,a=1):
     w,h = signal.freqz(b,a)
     h_dB = 20 * log10 (abs(h))
@@ -375,7 +431,7 @@ impz(b, a)
 ** Scatter plots of dT/dz & dS/dz
 Unfortunately, this doesn't look too promising. See below.
 *** All times
-#+BEGIN_SRC ipython :session :file images/dTdz-dSdz-RAMA13.png :exports both
+#+BEGIN_SRC ipython :session :file images/dTdz-dSdz-RAMA13.png :exports results :eval never-export
 
   def GMregress(x, y):
       import numpy as np
@@ -432,7 +488,7 @@ Unfortunately, this doesn't look too promising. See below.
 
 *** Divide into 4 seasons
 
-#+BEGIN_SRC ipython :session :file images/dTdz-dSdz-seasons.png :exports both
+#+BEGIN_SRC ipython :session :file images/dTdz-dSdz-seasons.png :exports results :eval never-export
 
   def suplabel(axis,label,label_prop=None,
                labelpad=5,
@@ -470,14 +526,6 @@ Unfortunately, this doesn't look too promising. See below.
       plt.text(x,y,label,rotation=rotation,
 		 transform=fig.transFigure,
 		 ha=ha,va=va, **label_prop)
-
-  def datenum2datetime(matlab_datenum):
-      from matplotlib.dates import num2date
-
-      python_datetime = num2date(matlab_datenum-367)
-
-      return python_datetime
-
 
   def ReturnSeason(time, var, season):
       ''' Given a season, return data only for the months in that season
@@ -523,7 +571,7 @@ All look kind of crap.
 
 Subsampling hourly data to daily frequency, and then interpolating back to hourly looks quite decent.
 
-#+BEGIN_SRC ipython :session :exports both :file images/rama12n90e-N2-subsampled.png
+#+BEGIN_SRC ipython :session :exports results :file images/rama12n90e-N2-subsampled.png :eval never-export
   alpha = 1.7e-3
   beta = 7.6e-4
 
@@ -550,7 +598,7 @@ Subsampling hourly data to daily frequency, and then interpolating back to hourl
   plt.ylabel('subsampled daily, interpolated to hourly')
   plt.axis('square')
   plt.axhline(0); plt.axvline(0)
-  line45()
+  dcpy.plots.line45()
 
 #+END_SRC
 
