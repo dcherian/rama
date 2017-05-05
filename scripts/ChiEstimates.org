@@ -22,7 +22,9 @@
   import h5py
   import sys
 
-  sys.path.append('/home/deepak/python')
+  if '/home/deepak/python/' not in sys.path:
+      sys.path.append('/home/deepak/python')
+
   import dcpy.plots
   import dcpy.util
   import chipy.chipy as chipy
@@ -142,7 +144,7 @@ Notes on above:
   importlib.reload(chipy)
 
   ra12 = moor.moor(90, 12, 'RAMA13', '../RAMA13/')
-  ra12.AddChipod(526, '2017-04-20.mat', 15, 'mm')
+  ra12.AddChipod(526, '2017-04-20.mat', 15, 'mm1')
   ra12.AddChipod(527, '2017-04-20.mat', 30, 'mm')
   ra12.ReadMet('../RAMA13/rama_mooring_data/met12n90e_10m.cdf')
   ra12.ReadCTD('../RamaPrelimProcessed/RAMA13.mat', 'ramaprelim')
@@ -156,12 +158,12 @@ Notes on above:
 
   ax = ra12.Plotχpods()
 
-  # ra12.χpod[527].PlotEstimate('chi', 'pm', hax=ax[-3], filter_len=24*6)
-  # ax[-3].set_title('')
+  ra12.χpod[527].PlotEstimate('chi', 'pm', hax=ax[-3], filter_len=86400)
+  ax[-3].set_title('')
 
   ax[-3].set_ylim([1e-10, 1e-6])
 
-  ra12.χpod[527].PlotEstimate('KT', 'pm', hax=ax[-2], filter_len=24*6)
+  ra12.χpod[527].PlotEstimate('KT', 'pm', hax=ax[-2], filter_len=86400)
   ax[-2].set_title('')
 
   ax[-1].set_ylim([-200, 200])
@@ -170,7 +172,7 @@ Notes on above:
   # plt.xlim([dt.datetime(2014, 2, 1), dt.datetime(2014,3,1)])
 #+END_SRC
 
-#+CAPTION: Daily averages of τ, N²; daily running median of K_T. min N² = 3e-6. Green is χ calculated with pitot velocity
+#+CAPTION: Daily averages of τ, N², J_q; daily running median of χ, K_T. min N² = 3e-6. Green is χ calculated with pitot velocity.
 #+RESULTS:
 [[file:images/rama13-summary.png]]
 
@@ -230,34 +232,39 @@ This estimate uses the tanh fit to determine N².
 
 *K_T:* ~mm1~, ~mm2~ agree well; Similarly ~mi11~ and ~mi22~ agree well.
 
-But there's a bias when comparing ~mm1~ with ~mi11~.
++But there's a bias when comparing ~mm1~ with ~mi11~.+
+- Bias is "fixed" by using T-S relation from a mooring CTD sensor along with Tz_i somehow. See below.
 
-I wonder if I should really fit salinity gradient instead of the backwards method I'm using currently.
+- Tz_i is calculated over 10 minutes
+
+- +I wonder if I should really fit salinity gradient instead of the backwards method I'm using currently.+
 
 Read data:
 #+BEGIN_SRC ipython :session :tangle yes :exports both :eval never-export
 
-  import chipy.chipy as chipy
-  import importlib
-  chipy = importlib.reload(chipy)
+import chipy.chipy as chipy
+import importlib
+chipy = importlib.reload(chipy)
 
-  apr20 = chipy.chipod('../RAMA13/data/', '526', '2017-04-20.mat')
-  apr20.LoadChiEstimates()
-  apr20.LoadSallyChiEstimate('../sally/chi_analysis_bkgrnd_Feb5/deglitched/mean_chi_526.mat', 'sally')
+apr20 = chipy.chipod('../RAMA13/data/', '526', '2017-04-20.mat')
+apr20.LoadChiEstimates()
+apr20.LoadSallyChiEstimate('../sally/chi_analysis_bkgrnd_Feb5/deglitched/mean_chi_526.mat', 'sally')
 
-  apr20.CalcKT()
-
+apr20.CalcKT()
 #+END_SRC
 
 #+RESULTS:
 
 **** ~mm~ vs. ~mi~
-#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/temp/py121246SIh.png
 
-apr20.CompareEstimates('chi', 'mm', 'mi', filter_len=24*6)
-plt.show()
+Sources of bias are:
+1. N² < 0 frequently when calculating N² from T-S relation and ∂T/∂z_i , so masking can be very different. For e.g., ~min_N² = 1e-7~ masks 15% of points for ~mm~ vs. ~30%~ of points for ~mi~
+2. Tz_i < Tz_m most of the time, so K_T is biased higher.
+
+#+BEGIN_SRC ipython :session :file images/temp/py121246SIh.png
+apr20.CompareEstimates('chi', 'mm', 'mi', filter_len=86400)
 #+END_SRC
-
+#+CAPTION: mm vs. mi
 #+RESULTS:
 [[file:images/temp/py121246SIh.png]]
 
@@ -268,13 +275,12 @@ plt.subplot(2, 2, (1, 2))
 plt.grid(which='both')
 plt.show()
 #+END_SRC
-
 #+RESULTS:
 [[file:images/temp/py12672yD.png]]
 **** Compare with sally's estimate - looks fine.
 #+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/temp/py12676SIh.png
 
-apr20.CompareEstimates('chi', 'mm1', 'sally1', filter_len=24*6)
+apr20.CompareEstimates('chi', 'mm1', 'sally1', 86400)
 plt.show()
 #+END_SRC
 
@@ -283,7 +289,7 @@ plt.show()
 
 #+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/temp/py12676AyD.png
 
-apr20.CompareEstimates('KT', 'mm', 'sally1', filter_len=24*6)
+apr20.CompareEstimates('KT', 'mm', 'sally1', 86400)
 #+END_SRC
 
 #+RESULTS:
