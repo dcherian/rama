@@ -1,0 +1,86 @@
+#+OPTIONS: html5-fancy:t tex:t broken-links:mark H:5
+#+HTML_DOCTYPE: html5
+#+HTML_CONTAINER: div
+#+LATEX_CLASS: dcnotebook
+#+HTML_HEAD: <link rel="stylesheet" href="notebook.css" type="text/css" />
+#+PROPERTY: header-args :eval never-export :tangle yes
+* Test out python functions
+** aliasing in daily means
+
++I have some factor of 2 error in frequency returned from ~dcpy.ts.SpectralDensity~.+ ; Using fft instead of rfft fixed it.
+
+Subsampled daily running means of M_2 tide alias to the usual alias frequency.
+
+Interesting!
+
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/alias-daily-avg-test.png
+
+import numpy as np
+import matplotlib.pyplot as plt
+dcpy.util = importlib.reload(dcpy.util)
+dcpy.ts = importlib.reload(dcpy.ts)
+from dcpy.util import MovingAverage
+from dcpy.ts import AliasFreq, SpectralDensity
+
+Tavg = 24
+π = np.pi
+TM2 = 12.42
+TM2alias = 1./AliasFreq(fM2, Tavg)
+
+t = np.arange(0, 10001)  # in hours
+M2 = 10*np.sin(2*π/TM2 * t)
+M2alias = 10*np.sin(2*π/TM2alias * t)
+
+tavg = MovingAverage(t, Tavg)
+M2avg = MovingAverage(M2, Tavg)
+
+plt.figure(figsize=(6.5, 3.4))
+plt.subplot(121)
+plt.plot(t, M2, label='pure M2')
+plt.plot(t[0::Tavg], M2[0::Tavg], label='M2 alias  to daily')
+plt.plot(tavg, 10* M2avg, label='10x daily average M2')
+plt.xlim([0, 1200])
+plt.ylim([-20, 20])
+plt.legend()
+
+plt.subplot(122)
+spec, freq, _ = SpectralDensity(M2, 1, nsmooth=1)
+plt.loglog(freq, spec, label='pure M2')
+
+spec, freq, _ = SpectralDensity(M2avg, Tavg, nsmooth=1)
+plt.loglog(freq, spec, label='daily average M2')
+
+spec, freq, _ = SpectralDensity(M2[0::Tavg], Tavg, nsmooth=1)
+plt.loglog(freq, spec, label='aliased M2')
+
+plt.legend()
+plt.axvline(1./TM2, color='k', zorder=-10, linewidth=0.4)
+plt.axvline(1./TM2alias, color='k', zorder=-10, linewidth=0.4)
+plt.axvline(1/2)
+plt.axvline(1/len(M2))
+plt.tight_layout()
+#+END_SRC
+
+#+RESULTS:
+[[file:images/alias-daily-avg-test.png]]
+** spectrogram
+
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/temp/py30956RdR.png
+
+from scipy.signal import spectrogram
+
+ndays = 20
+f, t, Sxx = spectrogram(M2, fs=1, nperseg=ndays*24)
+
+import matplotlib.pyplot as plt
+plt.pcolormesh(t, f, np.log10(Sxx))
+plt.axhline(1/TM2, color='k')
+plt.yscale('log')
+plt.colorbar()
+plt.xlabel('Time (hours)')
+plt.ylabel('Frequency (cph)')
+plt.title('PSD')
+#+END_SRC
+
+#+RESULTS:
+[[file:images/temp/py30956RdR.png]]
