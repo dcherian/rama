@@ -1,4 +1,4 @@
-#+TITLE: Compare various stratification estimates
+#+TITLE: RAMA13: Stratification
 #+AUTHOR: Deepak Cherian
 #+DATE: 02 Feb 2017
 
@@ -13,38 +13,41 @@
 * Load data + functions :noexport:
 
 #+BEGIN_SRC ipython :session :exports results :eval never-export
-      %matplotlib inline
-      import numpy as np
-      import matplotlib as mpl
-      import matplotlib.pyplot as plt
-      import datetime as dt
-      import hdf5storage as hs
-      from scipy.io import loadmat
+  %matplotlib inline
+  import numpy as np
+  import matplotlib as mpl
+  import matplotlib.pyplot as plt
+  import datetime as dt
+  import hdf5storage as hs
+  from scipy.io import loadmat
 
-      import sys
+
+  import sys
+  if '/home/deepak/python' not in sys.path:
       sys.path.append('/home/deepak/python')
-      import dcpy.plots
-      import dcpy.util
 
-      mpl.rcParams['savefig.transparent'] = True
-      mpl.rcParams['figure.figsize'] = [6.5, 6.5]
-      mpl.rcParams['figure.dpi'] = 120
-      mpl.rcParams['axes.facecolor'] = 'None'
+  import dcpy.plots
+  import dcpy.util
 
-      mat = hs.loadmat('../RAMA13/data/526/input/dTdz_i.mat')
-      Tz_i = mat['Tz_i'];
-      Tzi = Tz_i['Tz12'][0,0].squeeze()
-      TziTime = Tz_i['time'][0,0].squeeze()
+  mpl.rcParams['savefig.transparent'] = True
+  mpl.rcParams['figure.figsize'] = [6.5, 6.5]
+  mpl.rcParams['figure.dpi'] = 120
+  mpl.rcParams['axes.facecolor'] = 'None'
 
-      mat = hs.loadmat('../RAMA13/data/526/input/dTdz_m.mat')
-      Tz_m = mat['Tz_m'];
-      Tzm = Tz_m['Tz'][0,0].squeeze()
-      TzmTime = Tz_m['time'][0,0].squeeze()
-      #Szm = Tz_m['Sz'][0][0][0]
-      #sTS = Tz_m['s_TS'][0][0][0]
+  mat = hs.loadmat('../RAMA13/data/526/input/dTdz_i.mat')
+  Tz_i = mat['Tz_i'];
+  Tzi = Tz_i['Tz12'][0,0].squeeze()
+  TziTime = Tz_i['time'][0,0].squeeze() - 367
 
-      Tzi[abs(Tzi)>5] = np.nan
-      Tzm[abs(Tzm)>5] = np.nan
+  mat = hs.loadmat('../RAMA13/data/526/input/dTdz_m.mat')
+  Tz_m = mat['Tz_m'];
+  Tzm = Tz_m['Tz'][0,0].squeeze()
+  TzmTime = Tz_m['time'][0,0].squeeze() - 367
+  #Szm = Tz_m['Sz'][0][0][0]
+  #sTS = Tz_m['s_TS'][0][0][0]
+
+  Tzi[abs(Tzi)>5] = np.nan
+  Tzm[abs(Tzm)>5] = np.nan
 #+END_SRC
 
 #+RESULTS:
@@ -74,6 +77,26 @@
 #+END_SRC
 
 #+RESULTS:
+* Tz_i and Tz_m
+
+χpod 526 is moving vertically < 0.5m over a minute in general
+#+CAPTION: Displacement over a minute, using the entire year of data without averaging
+[[file:images/526-dispz.png]]
+
+
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/temp/py17346k9x.png
+
+  plt.figure(figsize=(6.5, 3.5))
+  plt.plot_date(TziTime, Tzi, '-', linewidth=0.5)
+  plt.plot_date(TzmTime, Tzm, '-', linewidth=0.5)
+
+  plt.legend(('internal', 'mooring'))
+
+#+END_SRC
+
+#+RESULTS:
+[[file:images/temp/py17346k9x.png]]
+
 * N² from Tz_i and Tz_m
 
 Use filtered 10 minute salinity to create N² with Tz_i.
@@ -124,7 +147,6 @@ ax1.set_xlim([dt.datetime(2014, 10, 1), dt.datetime(2014, 10, 15)])
 
 #+RESULTS:
 [[file:images/526-hudhud-tzi-tzm.png]]
-
 * Compare dT/dz between mooring and chipod
 #+BEGIN_SRC ipython :session :file images/mooring-chipod-dTdz.png :exports results :eval never-export
   f, (ax1, ax2) = plt.subplots(1,2)

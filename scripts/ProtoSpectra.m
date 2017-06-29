@@ -1,17 +1,34 @@
 % test out nmatlab spectra code before attempting the same exercise in python
 
-load ~/rama/RAMA13/data/526/proc/combined/2017-04-20.mat
+load ~/rama/RAMA13/data/527/proc/combined/2017-04-20.mat
 
 time = Turb.chi_mm1.time;
 dt = round(diff(time(1:2))*86400); % in seconds
-L = round(2*3600/dt);
+L = round(3600/dt); % averaging time period
 Lb2 = floor(L/2);
 N = (86400/L/dt); % number of points / day
 
 chi = nanmean([Turb.chi_mm1.chi; Turb.chi_mm2.chi], 1);
 chim = movmean(chi, L, 'omitnan');
+timem = movmean(time, L, 'omitnan');
 chim = chim(Lb2:L:end);
+timem = timem(Lb2:L:end);
+%% spectra by multiple subsets
 
+t0 = find_approx(timem, datenum(2014,8,1));
+t1 = find_approx(timem, datenum(2014,8,31));
+%MaxSubsetLength = 30*86400; % 1 month
+timesub = timem(t0:t1);
+chisub = chim(t0:t1);
+
+dts = (timesub(2)-timesub(1))*86400;
+ndays = 1;
+figure;
+hax = gca();
+[S, f] = GappySpectrum(chisub, [], 5);
+loglog(f/dts, S)
+
+%%
 T = nanmean([Turb.chi_mm1.T; Turb.chi_mm2.T], 1);
 T = T(1:515140);
 time = time(1:515140);
@@ -58,21 +75,21 @@ xlim([min(time) max(time)])
 uistack(hax.Children(1), 'bottom');
 datetick('keeplimits');
 xlabel('2014');
-ylabel('Frequency (cpd)')
+ ylabel('Frequency (cpd)')
 
-N2 = Turb.chi_mm1.N2(1:length(time));
-N2(N2<0) = NaN;
-TN = 2*pi./sqrt(N2);
-TN(N2 < 1e-7) = NaN;
-plot(time, movmean(86400./TN, 86400/dt, 'omitnan'), ...
-     'Color', [1 1 1]*0.6, 'LineWidth', 1);
+ N2 = Turb.chi_mm1.N2(1:length(time));
+ N2(N2<0) = NaN;
+ TN = 2*pi./sqrt(N2);
+ TN(N2 < 1e-7) = NaN;
+ plot(time, movmean(86400./TN, 86400/dt, 'omitnan'), ...
+      'Color', [1 1 1]*0.6, 'LineWidth', 1);
 
-hl = liney(Tdaily./[Tdaily Tf0 TM2], ...
-           {'daily'; 'inertial'; 'M2'});
-uistack(hl, 'top');
-liney(Tdaily/Tf0, 'inertial');
-title('PSD(temp) + N2')
-set(gca, 'Color', 'none');
+ hl = liney(Tdaily./[Tdaily Tf0 TM2], ...
+            {'daily'; 'inertial'; 'M2'});
+ uistack(hl, 'top');
+ liney(Tdaily/Tf0, 'inertial');
+ title('PSD(temp) + N2')
+ set(gca, 'Color', 'none');
 export_fig -transparent images/526-temp-spectrogram.png
 %%
 figure; maximize;

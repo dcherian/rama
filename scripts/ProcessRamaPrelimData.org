@@ -260,7 +260,7 @@ Though most points have dS/dz > 0.
 #+RESULTS:
 [[file:images/rama13-neg-N²-scatter.png]]
 
-** Salinity
+** Salinity :noexport:
 *** Difference: pre- and post-salinity 10m, 20m.
 
 #+BEGIN_SRC ipython :session :tangle yes :eval never-export :exports results :file images/rama13-sal-pre-post-cal.png
@@ -314,7 +314,7 @@ Nothing crazy in the interpolated product. Spiky at the surface, perhaps that's 
 
 #+RESULTS:
 [[file:images/rama13-interp-salinity.png]]
-** Temperature
+** Temperature :noexport:
 *** Read in netCDF 10 minute data                                :noexport:
 This is the same as date read from pre-cal .flg file.
 
@@ -366,7 +366,7 @@ There is no post-cal for temperature.
 #+RESULTS:
 [[file:ra107-pre-proc-temp.png]]
 ** 10 min vs. daily data
-*** Quality flags for daily data
+*** Quality flags for daily data :noexport:
 Wut, nothing's been flagged as adjusted in the daily data? ¯\ _(ツ)_/¯
 
 Quality flag = 2 = default quality; Pre-deployment calibrations applied.  Default value for sensors presently deployed and for sensors which were either not recovered or not calibratable when recovered.
@@ -393,7 +393,7 @@ Looks like they depend on the Hanning filter to deal with spiking.
 [[file:images/rama13-quality-dy.png]]
 
 *** Salinity
-#+BEGIN_SRC ipython :session :tangle yes :eval never-export :exports results :file images/rama13-sal-10m-dy.png
+#+BEGIN_SRC ipython :session :tangle yes :eval never-export :exports none :file images/rama13-sal-10m-dy.png
 Compare10mDy(ra107, 'sal', '')
 #+END_SRC
 
@@ -408,7 +408,7 @@ Compare10mDyDiff(ra107, 'sal', '')
 #+RESULTS:
 [[file:images/rama13-sal-diff-10m-dy.png]]
 
-*** Temperature
+*** Temperature :noexport:
 #+BEGIN_SRC ipython :session :tangle yes :eval never-export :exports results :file images/rama13-temp-10m-dy.png
 Compare10mDy(ra107, 'temp')
 #+END_SRC
@@ -429,7 +429,7 @@ Using density from .flg files is consistent. There seem be a lot of density inve
 
 winter convection?
 
-#+BEGIN_SRC ipython :session :tangle yes :eval never-export :exports results :file images/rama13-dens-10m-dy.png
+#+BEGIN_SRC ipython :session :tangle yes :eval never-export :exports none :file images/rama13-dens-10m-dy.png
  Compare10mDy(ra107, 'dens')
 #+END_SRC
 
@@ -508,7 +508,7 @@ Spline fits don't work well.
 #+RESULTS:
 [[file:images/N2-fit-compare.png]]
 
-** Save data
+** Save data :noexport:
 
 #+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export
   rama = importlib.reload(rama)
@@ -828,18 +828,21 @@ let's check distribution / variances - variances are only slightly higher.
 
 #+RESULTS:
 [[file:images/rama13-rama14-sal-histograms.png]]
-* Full 12n90e record
+* Full 12n90e record (daily netcdf)
 
 #+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export
-  ramaT = nc.Dataset('../t12n90e_dy.cdf')
-  ramaS = nc.Dataset('../s12n90e_dy.cdf')
+import netCDF4 as nc
+import seawater as sw
 
-  zind = [np.where(ramaT['depth'][:] == d)[0][0] for d in ramaS['depth'][:]]
-  S = ramaS['S_41'][:].squeeze()
-  T = ramaT['T_20'][:-1, zind, :, :].squeeze()
-  z = ramaS['depth'][:]
-  ρ = sw.pden(S, T, z)
-  t = ramaS['time'][:] + mpl.dates.date2num(dt.datetime(2007, 11, 16, 12, 00, 00))
+ramaT = nc.Dataset('../t12n90e_dy.cdf')
+ramaS = nc.Dataset('../s12n90e_dy.cdf')
+
+zind = [np.where(ramaT['depth'][:] == d)[0][0] for d in ramaS['depth'][:]]
+S = ramaS['S_41'][:].squeeze()
+T = ramaT['T_20'][:-1, zind, :, :].squeeze()
+z = ramaS['depth'][:]
+ρ = sw.pden(S, T, z)
+t = ramaS['time'][:] + mpl.dates.date2num(dt.datetime(2007, 11, 16, 12, 00, 00))
 
 #+END_SRC
 

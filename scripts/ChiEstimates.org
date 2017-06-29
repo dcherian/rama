@@ -4,7 +4,7 @@
 
 #+OPTIONS: html-link-use-abs-url:nil html-postamble:auto
 #+OPTIONS: html-preamble:t html-scripts:nil html-style:nil
-#+OPTIONS: html5-fancy:t tex:t broken-links:mark
+#+OPTIONS: html5-fancy:t tex:t broken-links:mark H:5
 #+HTML_DOCTYPE: html5
 #+HTML_CONTAINER: div
 #+LATEX_CLASS: dcnotebook
@@ -44,66 +44,6 @@
 #+CAPTION: χpod locations for ASIRI/EBOB/MesoBOB
 [[file:~/ebob/MixingmapASIRIPiston.png]]
 
-* what χ estimates are independent?
-
-I think it makes most sense to keep the different ∂T/∂z based estimates apart. I can average T1, T2 based estimates that use the same ancillary data.
-
------
-
-~T1~, ~T2~ are independent measures of the "same thing."
-
-internal ∂T/∂z and mooring Tz are independent measures of the temperature stratification
-
-for *526*: always mooring velocity, mooring N²
-- ~mm1~
-- ~mm2~
-- ~mi11~
-- ~mi22~
-
-for *527*: always pitot velocity, mooring N²
-- ~pm1~
-- ~pm2~
-- ~pi11~
-- ~pi22~
-
-Can I choose between mooring and internal dT/dz? They are /independent/ measures of ∂T/∂z
- - But you have to worry about which one is more appropriate especially when salinity is so important.
-* Stratification bias
-
-The Batchelor wavenumber appears to be a strong constraint on the fit; and it is unfortunately quite sensitive to relative magnitudes of N² and ∂T/∂z.
-
-Lessons:
-1. Use consistent ∂T/∂z and N².
-2. /Somehow/, T-S relation seems to work decently well.
-
------
-
-#+CAPTION: Averaging the 1s spectra over increasing intervals. χ estimate converges for n ≥ 5. Converged estimate is factor of 2 higher than initial 1s estimate. Using internal dT/dz results in χ that is factor of 3 higher than mooring dT/dz.
-[[file:images/chi-fit-averaged-spectra.png]]
-
-It appears that if I use N² and ∂T/∂z at different scales, then that biases the calculation of χ quite significantly.
-
-Using mooring N² and different ∂T/∂z results in biased PDF for χ (see two examples below)
-#+ATTR_HTML: :width 80%
-[[file:images/chi-same-N2-diff-dTdz-2.png]]
-#+ATTR_HTML: :width 80%
-[[file:images/chi-same-N2-diff-dTdz.png]]
-
-
-#+CAPTION: Changing T_z (here halved and doubled) changes k_b which shifts the spectrum. Associated χ values are [5e-9, 1.7e-9, 7e-10] for [T_z/2, T_z, T_z*2].
-[[file:images/chi-fit-Tz-sensitivity.png]]
-
-#+CAPTION: Changing N² (here halved and doubled) changes k_b which shifts the spectrum
-[[file:images/chi-fit-N2-sensitivity.png]]
-
-#+CAPTION: Ratio of Tz_i/Tz_m seems to be large enough that estimates will be biased.
-[[file:images/Tz-i-m-ration.png]]
-*** χ fitting
-
-- the inner loop (count) runs a lot on the first iteration; after that it only runs twice at most. This initial run is probably what biases ε
-
-- dff
-
 * RAMA13 (ra-107)
 |------------+------------+-----------------+----------------+------+---------|
 | Section    | Dir        | Vel             | S              | Tz   | Compass |
@@ -120,51 +60,52 @@ Notes on above:
 - Unsure what salinity I used for 2017-04-07. The big difference between that and 2017-04-12 is the N² time series. N^2 drift screws up χ estimate
 
 - Very sure that 2017-04-12 used hourly filtered 10min salinity.
-
-** functions
-#+BEGIN_SRC ipython :session :exports results
-  def smooth(y, box_pts):
-      box = np.ones(box_pts)/box_pts
-      y_smooth = np.convolve(y, box, mode='same')
-      return y_smooth
-
-#+END_SRC
-
-#+RESULTS:
 ** full mooring
 
 1. Looks like dS/dz is as important as dT/dz in N².
 2. For *30m* χpod, using *10m* mooring velocity instead of pitot makes basically no difference.
 
 #+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export
-  import moor.moor as moor
-  import importlib
+import moor.moor as moor
+import importlib
 
-  importlib.reload(moor)
-  importlib.reload(chipy)
+importlib.reload(moor)
+importlib.reload(chipy)
 
-  ra12 = moor.moor(90, 12, 'RAMA13', '../RAMA13/')
-  ra12.AddChipod(526, '2017-04-20.mat', 15, 'mm1')
-  ra12.AddChipod(527, '2017-04-20.mat', 30, 'mm')
-  ra12.ReadMet('../RAMA13/rama_mooring_data/met12n90e_10m.cdf')
-  ra12.ReadCTD('../RamaPrelimProcessed/RAMA13.mat', 'ramaprelim')
+import os
+if 'rama' not in os.getcwd():
+    os.chdir('/home/deepak/rama/scripts/')
+
+ra12 = moor.moor(90, 12, 'RAMA13', '../RAMA13/')
+ra12.AddChipod(526, 15, 'mm')
+ra12.AddChipod(527, 30, 'mm')
+ra12.ReadMet('../RAMA13/rama_mooring_data/met12n90e_10m.cdf')
+ra12.ReadCTD('../RamaPrelimProcessed/RAMA13.mat', 'ramaprelim')
 #+END_SRC
 
 #+RESULTS:
+
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/rama12n-kt-boxplot.png
+ra12.ChipodSeasonalSummary()
+#+END_SRC
+
+#+RESULTS:
+[[file:images/rama12n-kt-boxplot.png]]
 
 #+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/rama13-summary.png
   importlib.reload(moor)
   importlib.reload(chipy)
 
-  ax = ra12.Plotχpods()
+  filter_len = 86400
+  ax = ra12.Plotχpods(filter_len=filter_len)
 
-  ra12.χpod[527].PlotEstimate('chi', 'pm', hax=ax[-3], filter_len=86400)
-  ax[-3].set_title('')
+  # ra12.χpod[527].PlotEstimate('chi', 'pm', hax=ax[-3], filter_len=filter_len)
+  # ax[-3].set_title('')
 
-  ax[-3].set_ylim([1e-10, 1e-6])
+  ax[-3].set_ylim([1e-10, 1e-5])
 
-  ra12.χpod[527].PlotEstimate('KT', 'pm', hax=ax[-2], filter_len=86400)
-  ax[-2].set_title('')
+  # ra12.χpod[527].PlotEstimate('KT', 'pm', hax=ax[-2], filter_len=filter_len)
+  # ax[-2].set_title('')
 
   ax[-1].set_ylim([-200, 200])
 
@@ -182,6 +123,61 @@ Notes on above:
 
 [[file:images/rama13-dens-diff-10m-dy.png]]
 ** χ-pod 526
+*** Spectra
+**** Spectrogram
+
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export
+χ = apr20.chi['mm']['chi']
+χ[np.isnan(χ)] = 0
+
+fs = np.round(86400/apr20.dt)  # samples/day
+ndays = 7
+
+TM2 = 12.42
+Tf0 = 2*np.pi/sw.f(ra12.lat)
+#+END_SRC
+
+#+RESULTS:
+
+
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/temp/py30956SXk.png
+S, f, conf = SpectralDensity(χ, dt=1/fs, nsmooth=None)
+plt.loglog(f, S)
+plt.axvline(1/TM2, color='k', linewidth=0.5)
+plt.axvline(1/Tf0, color='k', linewidth=0.5)
+#+END_SRC
+
+#+RESULTS:
+[[file:images/temp/py30956SXk.png]]
+
+#+CAPTION: spectrum of χ (gaps filled with 0)
+#+RESULTS:
+
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/temp/py30956fa2.png
+from dcpy.ts import SpectralDensity
+import scipy.signal as signal
+
+f, t, Sxx = signal.spectrogram(χ, fs=fs,
+                               nperseg=ndays*fs,
+                               noverlap=ndays/2*fs)
+
+# Sxx[Sxx < 1e-70] = np.nan
+plt.pcolormesh(f, t, np.log10(Sxx.T))
+plt.yscale('log')
+plt.colorbar()
+plt.clim([-30, -8.5])
+plt.axhline(24/12.42)
+#+END_SRC
+#+CAPTION: Spectrogram
+#+RESULTS:
+[[file:images/temp/py30956fa2.png]]
+
+**** Proto χ spectrum
+#+CAPTION: [Unit 526, RAMA 12N, 15m] Testing out ~gappy_psd.m~ with different windows. I'm using daily or half-daily means and *filling in 2 day gaps*
+[[file:images/526-chi-proto-spectra.png]]
+
+#+CAPTION: spectrogram of temp with N² overlaid.
+[[file:images/526-temp-spectrogram.png]]
 *** Choosing Tz
 
 #+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/526-chi-change-Tz.png
@@ -221,7 +217,6 @@ Notes on above:
 #+CAPTION: Use χ calculated with mooring N². Calculate K_T with different dT/dz
 #+RESULTS:
 [[file:images/526-chi-change-Tz.png]]
-
 *** 2017-04-20
 
 [[file:images/N2-fit.png]]
@@ -249,35 +244,23 @@ chipy = importlib.reload(chipy)
 apr20 = chipy.chipod('../RAMA13/data/', '526', '2017-04-20.mat')
 apr20.LoadChiEstimates()
 apr20.LoadSallyChiEstimate('../sally/chi_analysis_bkgrnd_Feb5/deglitched/mean_chi_526.mat', 'sally')
-
 apr20.CalcKT()
 #+END_SRC
 
 #+RESULTS:
 
-**** ~mm~ vs. ~mi~
+**** TS relation + Tz_i
 
-Sources of bias are:
-1. N² < 0 frequently when calculating N² from T-S relation and ∂T/∂z_i , so masking can be very different. For e.g., ~min_N² = 1e-7~ masks 15% of points for ~mm~ vs. ~30%~ of points for ~mi~
-2. Tz_i < Tz_m most of the time, so K_T is biased higher.
-
-#+BEGIN_SRC ipython :session :file images/temp/py121246SIh.png
-apr20.CompareEstimates('chi', 'mm', 'mi', filter_len=86400)
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/temp/py30956onU.png
+apr20.CompareEstimates('chi', 'mm1', 'mi11');
 #+END_SRC
-#+CAPTION: mm vs. mi
-#+RESULTS:
-[[file:images/temp/py121246SIh.png]]
-
-#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/temp/py12672yD.png
-
-apr20.CompareEstimates('KT', 'mm', 'mi', filter_len=24*6)
-plt.subplot(2, 2, (1, 2))
-plt.grid(which='both')
-plt.show()
-#+END_SRC
-#+RESULTS:
-[[file:images/temp/py12672yD.png]]
 **** Compare with sally's estimate - looks fine.
+Reasons for differences:
+1. N² drift + my N² is nearly 0 for large chunks of time due to the fitting.
+2. different T_z used for masking: I always use internal. I think she's using mooring. There are differnces even if I match her ~min_dTdz=1e-3~
+3. She's NaNing some Jq and Kt values by hand.
+4. Her J_q is calculated using 1-min averaged χ, I think. Mine are calculated using instantaneous χ and then averaged.
+
 #+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/temp/py12676SIh.png
 
 apr20.CompareEstimates('chi', 'mm1', 'sally1', 86400)
@@ -295,21 +278,51 @@ apr20.CompareEstimates('KT', 'mm', 'sally1', 86400)
 #+RESULTS:
 [[file:images/temp/py12676AyD.png]]
 
-Let's compare sally's N² with mine.
-
 #+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/temp/py12676vJw.png
 
-    plt.plot_date(apr20.time, apr20.chi['mm1']['N2'].squeeze(),
-		  '-', linewidth=1, alpha=0.6)
-    plt.plot_date(apr20.chi['sally1']['time'].squeeze(),
-		  apr20.chi['sally1']['N2'].squeeze(),
-                  '-', linewidth=1, alpha=0.6)
-    plt.legend('My N² (tanh fit)', 'sally N2')
+plt.plot_date(apr20.time, apr20.chi['mm1']['N2'].squeeze(),
+	      '-', linewidth=1, alpha=0.6)
+plt.plot_date(apr20.chi['sally1']['time'].squeeze(),
+	      apr20.chi['sally1']['N2'].squeeze(),
+              '-', linewidth=1, alpha=0.6)
+plt.legend('My N² (tanh fit)', 'sally N2')
 
 #+END_SRC
 #+CAPTION: Sally's N² has salinity drift.
 #+RESULTS:
 [[file:images/temp/py12676vJw.png]]
+
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/compare-sally-summary.png
+
+plt.figure(figsize=(8, 3.5))
+plt.subplot(141)
+dcpy.plots.hist(apr20.chi['mm1']['chi'], log=True)
+dcpy.plots.hist(apr20.chi['sally1']['chi'], log=True)
+plt.title('χ')
+
+plt.subplot(142)
+dcpy.plots.hist(apr20.KT['mm1'], log=True)
+dcpy.plots.hist(apr20.chi['sally1']['Kt1'], log=True)
+plt.title('$K_T$')
+
+plt.subplot(143)
+dcpy.plots.hist(apr20.chi['mm1']['dTdz'], log=True)
+dcpy.plots.hist(apr20.chi['sally1']['dTdz'], log=True)
+plt.title('$|T_z|$')
+plt.legend(('mine', 'sally'))
+
+plt.subplot(144)
+dcpy.plots.hist(apr20.Jq['mm1'], log=True)
+dcpy.plots.hist(apr20.chi['sally1']['Jq1'], log=True)
+plt.title('$|J_q|$')
+
+plt.tight_layout()
+plt.show()
+#+END_SRC
+#+CAPTION: Sally seems to have NaN-ed out certain time instants by hand after using ~min_dTdz = 1e-3~. ~min_dTdz = 2e-3~ might be a good middle ground choise.
+#+RESULTS:
+[[file:images/compare-sally-summary.png]]
+
 *** 2017-04-12 :noexport:
 #+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export
 
@@ -532,19 +545,30 @@ c526.CompareEstimates('KT', 'mi11', 'pi11', filter_len=24*60)
 
 #+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export
 
-  import chipy.chipy as chipy
-  import importlib
-  chipy = importlib.reload(chipy)
+import chipy.chipy as chipy
+import importlib
+chipy = importlib.reload(chipy)
 
-  c527 = chipy.chipod('../RAMA13/data/', '527', '2017-04-20.mat')
+c527 = chipy.chipod('../RAMA13/data/', '527', '2017-04-20.mat', best='mm1')
 #+END_SRC
 
 #+RESULTS:
 
++zoom-in on "weird" stuff+ - this was because dT/dz masking was not right
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/temp/py2766pu1.png
+chipy = importlib.reload(chipy)
+
+c527 = chipy.chipod('../RAMA13/data/', '527', 'Turb.mat', best='mm1')
+c527.LoadT1T2()
+c527.Summarize(filter_len=86400)
+#+END_SRC
+
+#+RESULTS:
+[[file:images/temp/py2766pu1.png]]
 
 #+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/temp/py17346D9Q.png
 
-  c527.CompareEstimates('chi', 'mm2', 'pm1')
+c527.CompareEstimates('chi', 'mm1', 'mm2', filter_len=3600)
 
 #+END_SRC
 
@@ -552,8 +576,7 @@ c526.CompareEstimates('KT', 'mi11', 'pi11', filter_len=24*60)
 [[file:images/temp/py17346D9Q.png]]
 
 #+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/temp/py12676zpc.png
-
-c527.CompareEstimates('chi', 'pm1', 'pm2', filter_len=24*6)
+c527.CompareEstimates('KT', 'mm1', 'mm2', filter_len=None)
 #+END_SRC
 
 #+RESULTS:
@@ -561,7 +584,7 @@ c527.CompareEstimates('chi', 'pm1', 'pm2', filter_len=24*6)
 
 
 #+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/temp/py12676aIv.png
-c527.CompareEstimates('KT', 'pm1', 'pm2', filter_len=24*6)
+c527.CompareEstimates('KT', 'pm1', 'pm2', filter_len=86400)
 #+END_SRC
 
 #+RESULTS:
@@ -569,3 +592,63 @@ c527.CompareEstimates('KT', 'pm1', 'pm2', filter_len=24*6)
 * RAMA14 (ra-122)
 
  [[file:images/rama1314-T-s-ρ.png]]
+
+* what χ estimates are independent?
+
+I think it makes most sense to keep the different ∂T/∂z based estimates apart. I can average T1, T2 based estimates that use the same ancillary data.
+
+-----
+
+~T1~, ~T2~ are independent measures of the "same thing."
+
+internal ∂T/∂z and mooring Tz are independent measures of the temperature stratification
+
+for *526*: always mooring velocity, mooring N²
+- ~mm1~
+- ~mm2~
+- ~mi11~
+- ~mi22~
+
+for *527*: always pitot velocity, mooring N²
+- ~pm1~
+- ~pm2~
+- ~pi11~
+- ~pi22~
+
+Can I choose between mooring and internal dT/dz? They are /independent/ measures of ∂T/∂z
+ - But you have to worry about which one is more appropriate especially when salinity is so important.
+* Stratification bias
+
+The Batchelor wavenumber appears to be a strong constraint on the fit; and it is unfortunately quite sensitive to relative magnitudes of N² and ∂T/∂z.
+
+Lessons:
+1. Use consistent ∂T/∂z and N².
+2. /Somehow/, T-S relation seems to work decently well.
+
+-----
+
+#+CAPTION: Averaging the 1s spectra over increasing intervals. χ estimate converges for n ≥ 5. Converged estimate is factor of 2 higher than initial 1s estimate. Using internal dT/dz results in χ that is factor of 3 higher than mooring dT/dz.
+[[file:images/chi-fit-averaged-spectra.png]]
+
+It appears that if I use N² and ∂T/∂z at different scales, then that biases the calculation of χ quite significantly.
+
+Using mooring N² and different ∂T/∂z results in biased PDF for χ (see two examples below)
+#+ATTR_HTML: :width 80%
+[[file:images/chi-same-N2-diff-dTdz-2.png]]
+#+ATTR_HTML: :width 80%
+[[file:images/chi-same-N2-diff-dTdz.png]]
+
+
+#+CAPTION: Changing T_z (here halved and doubled) changes k_b which shifts the spectrum. Associated χ values are [5e-9, 1.7e-9, 7e-10] for [T_z/2, T_z, T_z*2].
+[[file:images/chi-fit-Tz-sensitivity.png]]
+
+#+CAPTION: Changing N² (here halved and doubled) changes k_b which shifts the spectrum
+[[file:images/chi-fit-N2-sensitivity.png]]
+
+#+CAPTION: Ratio of Tz_i/Tz_m seems to be large enough that estimates will be biased.
+[[file:images/Tz-i-m-ration.png]]
+*** χ fitting
+
+- the inner loop (count) runs a lot on the first iteration; after that it only runs twice at most. This initial run is probably what biases ε
+
+- dff
