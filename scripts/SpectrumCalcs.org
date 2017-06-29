@@ -5,9 +5,110 @@
 #+HTML_HEAD: <link rel="stylesheet" href="notebook.css" type="text/css" />
 #+PROPERTY: header-args :eval never-export :tangle yes
 * Test out python functions
+** Try multiple subsets of a time series
+- [X] generate synthetic time series
+- [X] add gaps
+- [X] plot spectrum for longest segment
+- given a freq band for which I want spectrum
+  - calculate max averaging I can do to get lo-freq end
+  - shortest segment to get hi-freq end
+- do averaging and supply segment length to plot spectrum.
+
+#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/temp/py2766UOs.png
+%matplotlib inline
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import numpy as np
+import sys
+import importlib
+
+if '/home/deepak/python/' not in sys.path:
+    sys.path.append('/home/deepak/python')
+    import dcpy.ts
+    import dcpy.util
+
+dcpy.ts = importlib.reload(dcpy.ts)
+dcpy.util = importlib.reload(dcpy.util)
+
+mpl.rcParams['savefig.transparent'] = True
+mpl.rcParams['figure.figsize'] = [6.5, 6.5]
+mpl.rcParams['figure.dpi'] = 180
+mpl.rcParams['axes.facecolor'] = 'None'
+
+dcpy.ts = importlib.reload(dcpy.ts)
+
+dt = 3600  # seconds
+nsmooth = 5
+
+ax1 = plt.subplot(211)
+ax2 = plt.subplot(212)
+
+# generate time series and plot actual spectrum
+y = dcpy.ts.synthetic(7000, dt, 1, -2)
+# dcpy.ts.PlotSpectrum(y, ax=ax2, dt=dt, nsmooth=nsmooth)
+# dcpy.ts.PlotSpectrum(y, ax=ax2, dt=dt, nsmooth=nsmooth,
+#                     SubsetLength=320)
+
+# Add gaps.
+ngaps = 10
+i0 = np.random.randint(0, len(y), ngaps)
+i1 = np.random.randint(0, len(y)/20, ngaps)
+for i00, i11 in zip(i0,i1):
+    y[i00:i00+i11] = np.nan
+
+ax1.plot(np.arange(len(y))*dt, y)
+
+# start, stop = dcpy.ts.FindSegments(y)
+# for [s0, s1] in zip(start, stop):
+#     ax1.axvline(s0*dt, color='g')
+#     ax1.axvline(s1*dt, color='r')
+
+# Plot spectrum of longest segment
+dcpy.ts.PlotSpectrum(y, ax=ax2, dt=dt, nsmooth=nsmooth*2,
+                     label='raw', zorder=10)
+
+def BreakSpectra(var, breakpoints, dt, ax1, ax2):
+    nsmooth = 4
+    start, stop = dcpy.ts.FindSegments(var)
+    MaxLength = max(stop-start)
+
+    for idx, bb in enumerate(breakpoints):
+        nn = bb/dt
+        SegmentLength = np.int(np.rint(min(nn * 2, MaxLength)))
+
+        if idx > 0:
+            navg = np.int(breakpoints[idx-1]/dt)
+            varavg = dcpy.util.MovingAverage(var, navg,
+                                             decimate=False,
+                                             min_count=1)
+            dtavg = dt #breakpoints[idx-1]
+        else:
+            varavg = var.copy()
+            dtavg = dt
+            navg = 1
+
+        ax1.plot(np.arange(len(varavg))*dt, varavg)
+
+        S, f, conf = dcpy.ts.SpectralDensity(
+            varavg, dt=dtavg, nsmooth=nsmooth,
+            SubsetLength=None)
+
+        S[f > 1/navg/dt] = np.nan
+        ax2.loglog(f, S, label=str(breakpoints[idx]/dt),
+                   zorder=idx+1)
+
+breakpoints = np.array([5, 20, 200, 1000, 2000])*3600  # in seconds
+BreakSpectra(y, breakpoints, dt, ax1, ax2)
+plt.legend()
+plt.show()
+#+END_SRC
+
+#+RESULTS:
+[[file:images/temp/py2766UOs.png]]
+
 ** aliasing in daily means
 
-+I have some factor of 2 error in frequency returned from ~dcpy.ts.SpectralDensity~.+ ; Using fft instead of rfft fixed it.
++I have some factor of 2 error in frequency returned from ~dcpy.ts.SpectralDensity~.+ ; _Using fft instead of rfft fixed it._
 
 Subsampled daily running means of M_2 tide alias to the usual alias frequency.
 
@@ -17,6 +118,9 @@ Interesting!
 
 import numpy as np
 import matplotlib.pyplot as plt
+import dcpy.util
+import dcpy.ts
+
 dcpy.util = importlib.reload(dcpy.util)
 dcpy.ts = importlib.reload(dcpy.ts)
 from dcpy.util import MovingAverage
@@ -25,7 +129,7 @@ from dcpy.ts import AliasFreq, SpectralDensity
 Tavg = 24
 π = np.pi
 TM2 = 12.42
-TM2alias = 1./AliasFreq(fM2, Tavg)
+TM2alias = 1./AliasFreq(1./TM2, Tavg)
 
 t = np.arange(0, 10001)  # in hours
 M2 = 10*np.sin(2*π/TM2 * t)
