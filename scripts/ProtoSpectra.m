@@ -1,6 +1,6 @@
 % test out nmatlab spectra code before attempting the same exercise in python
 
-load ~/rama/RAMA13/data/527/proc/combined/2017-04-20.mat
+load ~/rama/RAMA13/data/526/proc/combined/2017-04-20.mat
 
 time = Turb.chi_mm1.time;
 dt = round(diff(time(1:2))*86400); % in seconds
@@ -28,10 +28,9 @@ hax = gca();
 [S, f] = GappySpectrum(chisub, [], 5);
 loglog(f/dts, S)
 
-%%
 T = nanmean([Turb.chi_mm1.T; Turb.chi_mm2.T], 1);
-T = T(1:515140);
-time = time(1:515140);
+% T = T(1:515140);
+% time = time(1:515140);
 
 Tm = movmean(T, L, 'omitnan');
 timem = movmean(time, L, 'omitnan');

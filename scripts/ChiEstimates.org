@@ -9,34 +9,25 @@
 #+HTML_CONTAINER: div
 #+LATEX_CLASS: dcnotebook
 #+HTML_HEAD: <link rel="stylesheet" href="notebook.css" type="text/css" />
-#+PROPERTY: header-args :eval never-export :tangle yes
 
 * generic :noexport:
-#+BEGIN_SRC ipython :session :exports results
-  %matplotlib inline
-  import numpy as np
-  import matplotlib as mpl
-  import matplotlib.pyplot as plt
-  import datetime as dt
-  import bottleneck as bn
-  import h5py
-  import sys
+#+BEGIN_SRC ipython :session
+%matplotlib inline
 
-  if '/home/deepak/python/' not in sys.path:
-      sys.path.append('/home/deepak/python')
+import numpy as np
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import importlib
+import datetime as dt
+import bottleneck as bn
+import h5py
 
-  import dcpy.plots
-  import dcpy.util
-  import chipy.chipy as chipy
-  import importlib
-  dcpy = importlib.reload(dcpy)
+import dcpy.ts
+import dcpy.plots
+import dcpy.util
 
-  mpl.rcParams['savefig.transparent'] = True
-  mpl.rcParams['figure.figsize'] = [6.5, 6.5]
-  mpl.rcParams['figure.dpi'] = 180
-  mpl.rcParams['axes.facecolor'] = 'None'
-  # del c526
-  # c526mar = chipy.chipod('../RAMA13/data/', '526', 'first-try')
+import chipy.chipy as chipy
+import moor.moor as moor
 #+END_SRC
 
 #+RESULTS:
@@ -65,10 +56,11 @@ Notes on above:
 1. Looks like dS/dz is as important as dT/dz in N².
 2. For *30m* χpod, using *10m* mooring velocity instead of pitot makes basically no difference.
 
-#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export
+#+BEGIN_SRC ipython :session
+%matplotlib inline
+
 import moor.moor as moor
 import chipy.chipy as chipy
-import importlib
 
 importlib.reload(moor)
 importlib.reload(chipy)
@@ -80,82 +72,129 @@ if 'rama' not in os.getcwd():
 ra12 = moor.moor(90, 12, 'RAMA 12N | 2013', '../RAMA13/')
 ra12.AddChipod(526, 15, 'mm')
 ra12.AddChipod(527, 30, 'mm')
-ra12.ReadMet('../RAMA13/rama_mooring_data/met12n90e_10m.cdf')
+ra12.ReadMet('../RAMA13/rama_mooring_data/', WindType='pmel')
 ra12.ReadCTD('../RamaPrelimProcessed/RAMA13.mat', 'ramaprelim')
 #+END_SRC
 
 #+RESULTS:
 
-#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/ra12-526-temp-spectra.png
-dcpy.ts = importlib.reload(dcpy.ts)
-ticks = np.array([1/24, 1/12, 1/3, 12.42*3600/86400, 1, 2,
-                  5, 10, 20, 60])*86400
-# ax = ra12.χpod[526].PlotSpectrum('chi', filter_len=3600*12, nsmooth=3,
-#                                  SubsetLength=20*86400, ticks=None)
-ra12.PlotSpectrum('T', filter_len=1800, nsmooth=18,
-                  SubsetLength=120*86400, ticks=ticks, norm=False)
-plt.grid(True)
+#+BEGIN_SRC ipython :session :file images/TS-rama13.png
+dcpy.util = importlib.reload(dcpy.util)
+ra12.TSPlot(varname='KT', varmin=1e-3, filter_len=3600*12)
 #+END_SRC
-
+#+CAPTION: TS plot for RAMA 12N (2013) - coloured by depth. S_max is at 60m generally, though sometimes it appears at 40m. High values of K_T are marked.
 #+RESULTS:
-[[file:images/ra12-526-temp-spectra.png]]
+[[file:images/TS-rama13.png]]
 
-#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/ra12-spectra.png
+#+BEGIN_SRC ipython :session :file images/rama13-summary.png
+importlib.reload(chipy)
 
-ticks = np.array([1/2, 1, 2, 5, 10, 20, 30])*86400
+filter_len = 86400
+ax = ra12.Plotχpods(filter_len=filter_len)
 
-ra12.PlotAllSpectra(filter_len=3600*1.8, nsmooth=3,
-                    SubsetLength=13*86400, ticks=ticks)
+ax[-3].set_ylim([1e-10, 1e-5])
+ax[-1].set_ylim([-400, 200])
 
-# ra12.χpod[526].PlotSpectrum('chi', filter_len=3600*2, nsmooth=3,
-#                            SubsetLength=13*86400, ticks=ticks)
-#+END_SRC
-
-#+RESULTS:
-[[file:images/ra12-spectra.png]]
-
-#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/rama12n-kt-boxplot.png
-ra12.ChipodSeasonalSummary()
-#+END_SRC
-
-#+RESULTS:
-[[file:images/rama12n-kt-boxplot.png]]
-
-#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/rama13-summary.png
-  importlib.reload(moor)
-  importlib.reload(chipy)
-
-  filter_len = 86400
-  ax = ra12.Plotχpods(filter_len=filter_len)
-
-  # ra12.χpod[527].PlotEstimate('chi', 'pm', hax=ax[-3], filter_len=filter_len)
-  # ax[-3].set_title('')
-
-  ax[-3].set_ylim([1e-10, 1e-5])
-
-  # ra12.χpod[527].PlotEstimate('KT', 'pm', hax=ax[-2], filter_len=filter_len)
-  # ax[-2].set_title('')
-
-  ax[-1].set_ylim([-200, 200])
-
-  plt.tight_layout(h_pad=-0.6)
-  # plt.xlim([dt.datetime(2014, 2, 1), dt.datetime(2014,3,1)])
+plt.tight_layout(h_pad=-0.6)
 #+END_SRC
 
 #+CAPTION: Daily averages of τ, N², J_q; daily running median of χ, K_T. min N² = 3e-6. Green is χ calculated with pitot velocity.
 #+RESULTS:
 [[file:images/rama13-summary.png]]
 
+#+BEGIN_SRC ipython :session :file images/ra12-temp-spectra.png
+import dcpy.ts
+import numpy as np
+import matplotlib.pyplot as plt
+dcpy.ts = importlib.reload(dcpy.ts)
+
+ticks = np.array([1/24, 1/12, 1/3, 12.42*3600/86400, 1, 2,
+                  5, 10, 20, 60])*86400
+# ax = ra12.χpod[526].PlotSpectrum('chi', filter_len=3600*12, nsmooth=3,
+#                                  SubsetLength=20*86400, ticks=None)
+
+breakpts = np.sort(1/np.array([30, 1, 0.33, 0.08, 0.02])/86400)
+nsmooth = [2, 5, 12, 35, 120]
+
+ra12.PlotSpectrum('T', filter_len=None, nsmooth=nsmooth,
+                  breakpts=breakpts, SubsetLength=None,
+                  ticks=ticks, norm=True)
+
+plt.show()
+#+END_SRC
+
+#+RESULTS:
+[[file:images/ra12-temp-spectra.png]]
+
+#+BEGIN_SRC ipython :session :file images/ra12-spectra.png
+
+dcpy.ts = importlib.reload(dcpy.ts)
+
+ticks = np.array([1/2, 1, 2, 5, 10, 20, 30])*86400
+
+# ra12.PlotAllSpectra(filter_len=3600, nsmooth=3,χpod[526].
+#                    SubsetLength=13*86400, ticks=ticks)
+
+# ra12.PlotSpectrum('χ', filter_len=3600*3, nsmooth=12,
+#                   SubsetLength=None, ticks=ticks[2:-2])
+ra12.PlotSpectrum('χ', filter_len=3600*12, nsmooth=4,
+                  SubsetLength=None, ticks=ticks[:-2],
+                  ax=plt.gca(), norm=True)
+#+END_SRC
+
+#+RESULTS:
+[[file:images/ra12-spectra.png]]
+
+#+BEGIN_SRC ipython :session :file images/rama12n-kt-boxplot.png
+ra12.ChipodSeasonalSummary()
+#+END_SRC
+
+#+RESULTS:
+[[file:images/rama12n-kt-boxplot.png]]
+
 
 [[file:images/rama13-T-S-ρ.png]]
 
 
 [[file:images/rama13-dens-diff-10m-dy.png]]
+*** datashader test :noexport:
+#+BEGIN_SRC ipython :session    :file images/temp/py12159_Dn.png
+
+# test out TS plot
+import dcpy.oceans
+import numpy as np
+
+importlib.reload(dcpy.oceans)
+
+S = ra12.ctd.sal.copy()
+T = ra12.ctd.temp.copy()
+P = np.tile(ra12.ctd.depth, [S.shape[1], 1]).T
+assert(P.shape == S.shape)
+
+import pandas as pd
+df = pd.DataFrame(
+    np.array([S.ravel(), T.ravel(), P.ravel()]).T,
+    index=np.arange(S.ravel().shape[0]),
+    columns=['S', 'T', 'P'])
+
+# dcpy.oceans.TSplot(ra12.ctd.sal[0, :],
+#                    ra12.ctd.temp[0, :],
+#                    ra12.ctd.depth[0], 0)
+
+import datashader as ds
+import datashader.transfer_functions as tf
+cvs = ds.Canvas(plot_height=400, plot_width=400)
+agg = cvs.points(df, 'S', 'T', ds.mean('P'))
+img = tf.shade(agg, cmap=['lightblue', 'darkblue'])
+#+END_SRC
+
+#+RESULTS:
+
 ** χ-pod 526
 *** Spectra
 **** Spectrogram
 
-#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export
+#+BEGIN_SRC ipython :session
 χ = apr20.chi['mm']['chi']
 χ[np.isnan(χ)] = 0
 
@@ -169,7 +208,7 @@ Tf0 = 2*np.pi/sw.f(ra12.lat)
 #+RESULTS:
 
 
-#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/temp/py30956SXk.png
+#+BEGIN_SRC ipython :session    :file images/temp/py30956SXk.png
 S, f, conf = SpectralDensity(χ, dt=1/fs, nsmooth=None)
 plt.loglog(f, S)
 plt.axvline(1/TM2, color='k', linewidth=0.5)
@@ -182,7 +221,7 @@ plt.axvline(1/Tf0, color='k', linewidth=0.5)
 #+CAPTION: spectrum of χ (gaps filled with 0)
 #+RESULTS:
 
-#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/temp/py30956fa2.png
+#+BEGIN_SRC ipython :session    :file images/temp/py30956fa2.png
 from dcpy.ts import SpectralDensity
 import scipy.signal as signal
 
@@ -209,7 +248,7 @@ plt.axhline(24/12.42)
 [[file:images/526-temp-spectrogram.png]]
 *** Choosing Tz
 
-#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/526-chi-change-Tz.png
+#+BEGIN_SRC ipython :session    :file images/526-chi-change-Tz.png
 
   import dcpy.plots
   importlib.reload(dcpy.plots)
@@ -264,7 +303,7 @@ This estimate uses the tanh fit to determine N².
 - +I wonder if I should really fit salinity gradient instead of the backwards method I'm using currently.+
 
 Read data:
-#+BEGIN_SRC ipython :session :tangle yes :exports both :eval never-export
+#+BEGIN_SRC ipython :session  :exports both
 
 import chipy.chipy as chipy
 import importlib
@@ -280,26 +319,26 @@ apr20.CalcKT()
 
 **** TS relation + Tz_i
 
-#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/temp/py30956onU.png
+#+BEGIN_SRC ipython :session    :file images/temp/py30956onU.png
 apr20.CompareEstimates('chi', 'mm1', 'mi11');
 #+END_SRC
 **** Compare with sally's estimate - looks fine.
 Reasons for differences:
 1. N² drift + my N² is nearly 0 for large chunks of time due to the fitting.
-2. different T_z used for masking: I always use internal. I think she's using mooring. There are differnces even if I match her ~min_dTdz=1e-3~
+2. different T_z used for masking: +I always use internal.+ I think she's using mooring. There are differnces even if I match her ~min_dTdz=1e-3~
 3. She's NaNing some Jq and Kt values by hand.
-4. Her J_q is calculated using 1-min averaged χ, I think. Mine are calculated using instantaneous χ and then averaged.
+4. +Her J_q is calculated using 1-min averaged χ, I think. Mine are calculated using instantaneous χ and then averaged.+ Doesn't really matter
 
-#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/temp/py12676SIh.png
+#+BEGIN_SRC ipython :session    :file images/temp/py12676SIh.png
 
-apr20.CompareEstimates('chi', 'mm1', 'sally1', 86400)
+apr20.CompareEstimates('chi', 'mm', 'sally1', 86400)
 plt.show()
 #+END_SRC
 
 #+RESULTS:
 [[file:images/temp/py12676SIh.png]]
 
-#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/temp/py12676AyD.png
+#+BEGIN_SRC ipython :session    :file images/temp/py12676AyD.png
 
 apr20.CompareEstimates('KT', 'mm', 'sally1', 86400)
 #+END_SRC
@@ -307,7 +346,7 @@ apr20.CompareEstimates('KT', 'mm', 'sally1', 86400)
 #+RESULTS:
 [[file:images/temp/py12676AyD.png]]
 
-#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/temp/py12676vJw.png
+#+BEGIN_SRC ipython :session    :file images/temp/py12676vJw.png
 
 plt.plot_date(apr20.time, apr20.chi['mm1']['N2'].squeeze(),
 	      '-', linewidth=1, alpha=0.6)
@@ -321,39 +360,46 @@ plt.legend('My N² (tanh fit)', 'sally N2')
 #+RESULTS:
 [[file:images/temp/py12676vJw.png]]
 
-#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/compare-sally-summary.png
 
+#+BEGIN_SRC ipython :session    :file images/temp/py17170nPm.png
+
+apr20.Summarize(est='sally1', filter_len=86400)
+#+END_SRC
+
+#+BEGIN_SRC ipython :session    :file images/compare-sally-summary.png
+
+est = 'mm'
 plt.figure(figsize=(8, 3.5))
 plt.subplot(141)
-dcpy.plots.hist(apr20.chi['mm1']['chi'], log=True)
+dcpy.plots.hist(apr20.chi[est]['chi'], log=True)
 dcpy.plots.hist(apr20.chi['sally1']['chi'], log=True)
 plt.title('χ')
 
 plt.subplot(142)
-dcpy.plots.hist(apr20.KT['mm1'], log=True)
+dcpy.plots.hist(apr20.KT[est], log=True)
 dcpy.plots.hist(apr20.chi['sally1']['Kt1'], log=True)
 plt.title('$K_T$')
 
 plt.subplot(143)
-dcpy.plots.hist(apr20.chi['mm1']['dTdz'], log=True)
+dcpy.plots.hist(apr20.chi[est]['dTdz'], log=True)
 dcpy.plots.hist(apr20.chi['sally1']['dTdz'], log=True)
 plt.title('$|T_z|$')
 plt.legend(('mine', 'sally'))
 
 plt.subplot(144)
-dcpy.plots.hist(apr20.Jq['mm1'], log=True)
+dcpy.plots.hist(apr20.Jq[est], log=True)
 dcpy.plots.hist(apr20.chi['sally1']['Jq1'], log=True)
 plt.title('$|J_q|$')
 
 plt.tight_layout()
 plt.show()
 #+END_SRC
-#+CAPTION: Sally seems to have NaN-ed out certain time instants by hand after using ~min_dTdz = 1e-3~. ~min_dTdz = 2e-3~ might be a good middle ground choise.
+#+CAPTION: Sally seems to have NaN-ed out certain time instants by hand after using ~min_dTdz = 1e-3~. ~min_dTdz = 2e-3~ might be a good middle ground choice.
 #+RESULTS:
 [[file:images/compare-sally-summary.png]]
 
 *** 2017-04-12 :noexport:
-#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export
+#+BEGIN_SRC ipython :session
 
 import chipy.chipy as chipy
 
@@ -368,7 +414,7 @@ apr12.CalcKT()
 
 #+RESULTS:
 
-#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/chi-mm1-apr07-apr12.png
+#+BEGIN_SRC ipython :session    :file images/chi-mm1-apr07-apr12.png
 
   window=None
 
@@ -400,7 +446,7 @@ The difference is N² but why is χ higher for higher N^2?
 \[ k_b ∝ ε_χ ∝ N^2 \]
 
 
-#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/temp/py12676_n2.png
+#+BEGIN_SRC ipython :session    :file images/temp/py12676_n2.png
 
   plt.plot_date(apr07.chi['mm1']['time'], apr07.chi['mm1']['N2'],
 		'-', linewidth=1)
@@ -419,7 +465,7 @@ The difference is N² but why is χ higher for higher N^2?
 *** 2017-04-07 :noexport:
  | 10-min *unfiltered*  salinity | mooring dT/dz |
 
-#+BEGIN_SRC ipython :session :exports results
+#+BEGIN_SRC ipython :session
   c526 = chipy.chipod('../RAMA13/data/', '526', '2017-04-07')
   c526.LoadChiEstimates()
   c526.LoadSallyChiEstimate('../sally/chi_analysis_bkgrnd_Feb5/deglitched/mean_chi_526.mat', 'sally')
@@ -430,7 +476,7 @@ The difference is N² but why is χ higher for higher N^2?
 
 #+RESULTS:
 **** test filtering
-#+BEGIN_SRC ipython :session  :exports results :file images/temp/py172156XN.png
+#+BEGIN_SRC ipython :session   :file images/temp/py172156XN.png
 
   w, h = mpl.figure.figaspect(1/1.618)
   plt.figure(figsize=(w,h))
@@ -443,14 +489,14 @@ The difference is N² but why is χ higher for higher N^2?
 
 **** scatter χ vs. velocity
 
-#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/chi-velocity-526.png
+#+BEGIN_SRC ipython :session    :file images/chi-velocity-526.png
 
 
 #+END_SRC
 **** ~mm1~ vs. sally
 
 Seems to agree fine. My estimates tend to be noisier; this is probably because of salinity spiking --- this estimate uses unfiltered 10-min salinity.
-#+BEGIN_SRC ipython :session :tangle yes :exports results  :file images/chi-526-prelimsal-mm1-sally.png
+#+BEGIN_SRC ipython :session    :file images/chi-526-prelimsal-mm1-sally.png
   w, h = mpl.figure.figaspect(1/1.618)
   plt.figure(figsize=(w,h))
   c526.PlotEstimate('KT', 'mm1', filter_len=24*60+1)
@@ -461,7 +507,7 @@ Seems to agree fine. My estimates tend to be noisier; this is probably because o
 #+RESULTS:
 [[file:images/chi-526-prelimsal-mm1-sally.png]]
 **** ~mm1~ vs. ~mm2~
-#+BEGIN_SRC ipython :session :tangle yes :exports results  :file images/chi-526-prelimsal-mm1-mm2.png
+#+BEGIN_SRC ipython :session    :file images/chi-526-prelimsal-mm1-mm2.png
   c526.CompareEstimates('chi', 'mm1', 'mm2', filter_len=24*60+1)
 #+END_SRC
 
@@ -469,7 +515,7 @@ Seems to agree fine. My estimates tend to be noisier; this is probably because o
 [[file:images/chi-526-prelimsal-mm1-mm2.png]]
 
 **** Sally T1 vs. T2
-#+BEGIN_SRC ipython :session :tangle yes :exports results  :file images/chi-526-sally-mm1-mm2.png
+#+BEGIN_SRC ipython :session    :file images/chi-526-sally-mm1-mm2.png
 c526.CompareEstimates('chi', 'sally1', 'sally2', filter_len=5*24*6+1)
 #+END_SRC
 
@@ -478,7 +524,7 @@ c526.CompareEstimates('chi', 'sally1', 'sally2', filter_len=5*24*6+1)
 
 **** Distributions
 
-#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/temp/py12676O0V.png
+#+BEGIN_SRC ipython :session    :file images/temp/py12676O0V.png
 
 chi = c526.chi['mm1']['chi'][:].squeeze()
 
@@ -486,14 +532,14 @@ chi = c526.chi['mm1']['chi'][:].squeeze()
 #+END_SRC
 *** first try :noexport:
 **** ~mm1~ and ~mi11~ agree really well.
-#+BEGIN_SRC ipython :session   :exports results :file images/RAMA13-chi-compare-526-mm1-mi11.png
+#+BEGIN_SRC ipython :session    :file images/RAMA13-chi-compare-526-mm1-mi11.png
   c526.CompareEstimates('chi', 'mm1', 'mi11')
 #+END_SRC
 
 #+RESULTS:
 [[file:images/RAMA13-chi-compare-526-mm1-mi11.png]]
 
-#+BEGIN_SRC ipython :session :exports results :file images/RAMA13-KT-compare-mm1-mi11.png
+#+BEGIN_SRC ipython :session  :file images/RAMA13-KT-compare-mm1-mi11.png
 c526.CompareEstimates('KT', 'mm1', 'mi11')
 #+END_SRC
 
@@ -501,7 +547,7 @@ c526.CompareEstimates('KT', 'mm1', 'mi11')
 [[file:images/RAMA13-KT-compare-mm1-mi11.png]]
 
 **** ~mi11~ and ~mi22~ disagree quite a lot!
-#+BEGIN_SRC ipython :session   :exports results :file images/RAMA13-chi-compare-526-mi11-mi22.png
+#+BEGIN_SRC ipython :session    :file images/RAMA13-chi-compare-526-mi11-mi22.png
 
 c526.CompareEstimates('chi', 'mi11', 'mi22')
 
@@ -509,7 +555,7 @@ c526.CompareEstimates('chi', 'mi11', 'mi22')
 
 #+RESULTS:
 [[file:images/RAMA13-chi-compare-526-mi11-mi22.png]]
-#+BEGIN_SRC ipython :session :exports results :file images/RAMA13-kt-compare-526-mi11-mi22.png
+#+BEGIN_SRC ipython :session  :file images/RAMA13-kt-compare-526-mi11-mi22.png
 
 c526.CompareEstimates('KT', 'mi11', 'mi22')
 
@@ -521,7 +567,7 @@ c526.CompareEstimates('KT', 'mi11', 'mi22')
 **** ~mi11~ and ~pi11~ agree well - but pitot voltage drifts!
 This is with the 40-day high pass filtered pitot but I forgot to add back the 40-day mean.
 
-#+BEGIN_SRC ipython :session   :exports results :file images/RAMA13-chi-compare-526-mi11-pi11.png
+#+BEGIN_SRC ipython :session    :file images/RAMA13-chi-compare-526-mi11-pi11.png
 
 c526.CompareEstimates('chi', 'mi11', 'pi11', filter_len=24*60)
 
@@ -530,7 +576,7 @@ c526.CompareEstimates('chi', 'mi11', 'pi11', filter_len=24*60)
 #+RESULTS:
 [[file:images/RAMA13-chi-compare-526-mi11-pi11.png]]
 
-#+BEGIN_SRC ipython :session :exports results :file images/RAMA13-kt-compare-526-mi11-pi11.png
+#+BEGIN_SRC ipython :session  :file images/RAMA13-kt-compare-526-mi11-pi11.png
 
 c526.CompareEstimates('KT', 'mi11', 'pi11', filter_len=24*60)
 
@@ -541,7 +587,7 @@ c526.CompareEstimates('KT', 'mi11', 'pi11', filter_len=24*60)
 
 **** masking
 
-#+BEGIN_SRC ipython :session :exports results :file images/temp/py172156XN.png
+#+BEGIN_SRC ipython :session  :file images/temp/py172156XN.png
 
   chi = c526.chi['mi11']
   N2 = chi['N2'][:].squeeze()
@@ -572,19 +618,18 @@ c526.CompareEstimates('KT', 'mi11', 'pi11', filter_len=24*60)
 #+CAPTION: Pitot tube dies in June and temperature dies by October  (;´༎ຶД༎ຶ`)
 [[file:~/rama/RAMA13/quick_summary/527/summary1_527.png]]
 
-#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export
-
+#+BEGIN_SRC ipython :session
 import chipy.chipy as chipy
 import importlib
 chipy = importlib.reload(chipy)
 
-c527 = chipy.chipod('../RAMA13/data/', '527', '2017-04-20.mat', best='mm1')
+c527 = chipy.chipod('../RAMA13/data/', '527', '2017-04-20.mat', best='mm')
 #+END_SRC
 
 #+RESULTS:
 
 +zoom-in on "weird" stuff+ - this was because dT/dz masking was not right
-#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/temp/py2766pu1.png
+#+BEGIN_SRC ipython :session :file images/temp/py2766pu1.png
 chipy = importlib.reload(chipy)
 
 c527 = chipy.chipod('../RAMA13/data/', '527', 'Turb.mat', best='mm1')
@@ -595,7 +640,7 @@ c527.Summarize(filter_len=86400)
 #+RESULTS:
 [[file:images/temp/py2766pu1.png]]
 
-#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/temp/py17346D9Q.png
+#+BEGIN_SRC ipython :session :file images/temp/py17346D9Q.png
 
 c527.CompareEstimates('chi', 'mm1', 'mm2', filter_len=3600)
 
@@ -604,7 +649,7 @@ c527.CompareEstimates('chi', 'mm1', 'mm2', filter_len=3600)
 #+RESULTS:
 [[file:images/temp/py17346D9Q.png]]
 
-#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/temp/py12676zpc.png
+#+BEGIN_SRC ipython :session :file images/temp/py12676zpc.png
 c527.CompareEstimates('KT', 'mm1', 'mm2', filter_len=None)
 #+END_SRC
 
@@ -612,7 +657,7 @@ c527.CompareEstimates('KT', 'mm1', 'mm2', filter_len=None)
 [[file:images/temp/py12676zpc.png]]
 
 
-#+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/temp/py12676aIv.png
+#+BEGIN_SRC ipython :session :file images/temp/py12676aIv.png
 c527.CompareEstimates('KT', 'pm1', 'pm2', filter_len=86400)
 #+END_SRC
 

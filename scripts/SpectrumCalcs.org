@@ -9,10 +9,12 @@
 - [X] generate synthetic time series
 - [X] add gaps
 - [X] plot spectrum for longest segment
-- given a freq band for which I want spectrum
+- [X] given a freq band for which I want spectrum
   - calculate max averaging I can do to get lo-freq end
   - shortest segment to get hi-freq end
-- do averaging and supply segment length to plot spectrum.
+- [X] do averaging and supply segment length to plot spectrum.
+
+BAH! THIS GETS SCREWED BY ALIASING IF THERE ARE PEAKS
 
 #+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/temp/py2766UOs.png
 %matplotlib inline
@@ -38,21 +40,26 @@ mpl.rcParams['axes.facecolor'] = 'None'
 dcpy.ts = importlib.reload(dcpy.ts)
 
 dt = 3600  # seconds
-nsmooth = 5
+nsmooth = 3
 
 ax1 = plt.subplot(211)
 ax2 = plt.subplot(212)
 
 # generate time series and plot actual spectrum
 y = dcpy.ts.synthetic(7000, dt, 1, -2)
-# dcpy.ts.PlotSpectrum(y, ax=ax2, dt=dt, nsmooth=nsmooth)
+π = np.pi
+y += max(y) * np.sin(np.arange(len(y))*dt * 2*π/(12.42*3600) )
+y += max(y) * np.sin(np.arange(len(y))*dt * 2*π/(5*86400) )
+
+dcpy.ts.PlotSpectrum(y, ax=ax2, dt=dt, nsmooth=nsmooth*4,
+                     zorder=-100, color='gray')
 # dcpy.ts.PlotSpectrum(y, ax=ax2, dt=dt, nsmooth=nsmooth,
 #                     SubsetLength=320)
 
 # Add gaps.
-ngaps = 10
+ngaps = 40
 i0 = np.random.randint(0, len(y), ngaps)
-i1 = np.random.randint(0, len(y)/20, ngaps)
+i1 = np.random.randint(0, len(y)/40, ngaps)
 for i00, i11 in zip(i0,i1):
     y[i00:i00+i11] = np.nan
 
@@ -64,17 +71,23 @@ ax1.plot(np.arange(len(y))*dt, y)
 #     ax1.axvline(s1*dt, color='r')
 
 # Plot spectrum of longest segment
-dcpy.ts.PlotSpectrum(y, ax=ax2, dt=dt, nsmooth=nsmooth*2,
-                     label='raw', zorder=10)
+# dcpy.ts.PlotSpectrum(y, ax=ax2, dt=dt, nsmooth=nsmooth*4,
+#                     label='raw', zorder=10)
 
-def BreakSpectra(var, breakpoints, dt, ax1, ax2):
+def BreakSpectra(var, breakpoints, dt, ax1=None, ax2=None):
     nsmooth = 4
     start, stop = dcpy.ts.FindSegments(var)
     MaxLength = max(stop-start)
 
+    if ax1 is None:
+        ax1 = plt.subplot(211)
+
+    if ax2 is None:
+        ax2 = plt.subplot(212)
+
     for idx, bb in enumerate(breakpoints):
         nn = bb/dt
-        SegmentLength = np.int(np.rint(min(nn * 2, MaxLength)))
+        SegmentLength = np.int(np.rint(min(nn * 2.5, MaxLength)))
 
         if idx > 0:
             navg = np.int(breakpoints[idx-1]/dt)
@@ -91,13 +104,14 @@ def BreakSpectra(var, breakpoints, dt, ax1, ax2):
 
         S, f, conf = dcpy.ts.SpectralDensity(
             varavg, dt=dtavg, nsmooth=nsmooth,
-            SubsetLength=None)
+            SubsetLength=SegmentLength)
 
         S[f > 1/navg/dt] = np.nan
         ax2.loglog(f, S, label=str(breakpoints[idx]/dt),
                    zorder=idx+1)
 
-breakpoints = np.array([5, 20, 200, 1000, 2000])*3600  # in seconds
+breakpoints = np.array([5, 10, 15, 20, 40,
+                        100, 300, 700, 1000])*3600  # in seconds
 BreakSpectra(y, breakpoints, dt, ax1, ax2)
 plt.legend()
 plt.show()
