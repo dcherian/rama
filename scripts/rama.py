@@ -166,12 +166,11 @@ def ReadPrelimData(rama, fname):
     for depth in rama['sal-pre'].dtype.names:
         rama['dens-pre'][depth] = rama['dens-pre'][depth] + 1000
         rama['dens-post'][depth] = rama['dens-post'][depth] + 1000
-        rama['temp'][depth] = smooth(rama['temp-pre'][depth], window_len)
+        rama['temp'][depth] = rama['temp-pre'][depth]
 
         # pre to post-cal interpolation
-        rama['cond'][depth] = smooth(weight_pre * rama['cond-pre'][depth]
-                                     + weight_post * rama['cond-post'][depth],
-                                     window_len)
+        rama['cond'][depth] = weight_pre * rama['cond-pre'][depth] \
+            + weight_post * rama['cond-post'][depth]
 
         pres = sw.eos80.pres(float(depth), 12)
         rama['sal'][depth] = sw.eos80.salt(rama['cond'][depth]
