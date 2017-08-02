@@ -76,6 +76,30 @@ p.s. The 10m current data will be posted later, - I'll let you know when those a
 #+RESULTS:
 
 * RAMA13 (ra-107)
+** Better method
+Rather than fitting tanh profiles,
+
+1. I manually go in and figure what linear trends in N² need to be subtracted out to minimize number of negative N² points at each depth.
+2. this ΔN² ≡ ΔS at depths between two instruments
+3. Form the system of linear equations for corrections at each depth : ε_i
+     ε_1 - ε_2 = ΔS_12
+     ε_2 - ε_3 = ΔS_23
+     ε_3 - ε_4 = ΔS_34
+5. Solving the least squares problem gives the corrections at each depth ε_i
+
+*** RAMA13
+#+CAPTION: For some reason 40m instrument is not corrected. Density differences between 40m and 60m instruments look fine, no negative N² so nothing obvious that needs to be corrected.
+[[file:images/fix-RAMA13-N2.png]]
+
+#+CAPTION: nothing obviously different in salinity contours. Overlaid black contour is the correction
+[[file:images/fix-RAMA13-sal.png]]
+
+*** RAMA14
+#+CAPTION: RAMA14
+[[file:images/fix-RAMA14-N2.png]]
+
+#+CAPTION: RAMA14
+[[file:images/fix-RAMA14-sal.png]]
 ** Read data
 #+BEGIN_quote
   I'd apply a /pre-to-post-cal linear interpolation/ across the data to correct for large-scale drifts (i.e. the first data value in the interpolated output would have a pre-cal applied, while the last value would have a post-cal applied, with the values interpolated in between).
@@ -88,10 +112,9 @@ ra107 = rama.Initialize('RAMA13', '107')
 #+END_SRC
 
 #+RESULTS:
-
 ** Property plots
 #+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/rama13-T-S-ρ.png
-  PcolorAll(ra107, ylim=[-50, 0])
+PcolorAll(ra107, ylim=[-50, 0])
 #+END_SRC
 
 #+RESULTS:
@@ -447,32 +470,32 @@ Compare10mDyDiff(ra107, 'dens', '', filt=True, window_len=13)
 
 Spline fits don't work well.
 #+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export :file images/N2-fit.png
-  import rama
-  rama = importlib.reload(rama)
-  rama.MakeArrays(ra107)
-  try:
-      dcpy.fits = importlib.reload(dcpy.fits)
-  except:
-      pass
+import rama
+rama = importlib.reload(rama)
+rama.MakeArrays(ra107)
+try:
+    dcpy.fits = importlib.reload(dcpy.fits)
+except:
+    pass
 
-  var = 'densarr'
-  # zarr = np.array([1.0, 10.0, 20.0, 40.0, 60.0, 100.0]) + 1e-5
-  zarr = ra107['presarr'][:, 0]
-  curve = 'tanh'
-  plt.subplot(311)
-  N2, N2z = rama.N2fit(ra107[var], zarr, tt=20290,
-		       depth0=15, doplot=True, curve=curve)
+var = 'densarr'
+# zarr = np.array([1.0, 10.0, 20.0, 40.0, 60.0, 100.0]) + 1e-5
+zarr = ra107['presarr'][:, 0]
+curve = 'tanh'
+plt.subplot(311)
+N2, N2z = rama.N2fit(ra107[var], zarr, tt=20290,
+		     depth0=15, doplot=True, curve=curve)
 
-  plt.subplot(312)
-  N2, N2z = rama.N2fit(ra107[var], zarr, tt=22130,
-		       depth0=15, doplot=True, curve=curve)
+plt.subplot(312)
+N2, N2z = rama.N2fit(ra107[var], zarr, tt=22130,
+		     depth0=15, doplot=True, curve=curve)
 
-  plt.subplot(313)
-  N2, N2z = rama.N2fit(ra107[var], zarr, tt=50400,
-			depth0=15, doplot=True, curve=curve)
+plt.subplot(313)
+N2, N2z = rama.N2fit(ra107[var], zarr, tt=50400,
+		     depth0=15, doplot=True, curve=curve)
 
-  plt.tight_layout()
-  plt.show()
+plt.tight_layout()
+plt.show()
 #+END_SRC
 #+CAPTION: Doing fit and weighting differently according to season works well. The 60m is too strong a constraint.
 #+RESULTS:
@@ -511,8 +534,9 @@ Spline fits don't work well.
 ** Save data :noexport:
 
 #+BEGIN_SRC ipython :session :tangle yes :exports results :eval never-export
-  rama = importlib.reload(rama)
-  rama.SaveRama(ra107)
+rama = importlib.reload(rama)
+rama.MakeArrays(ra107)
+rama.SaveRama(ra107)
 #+END_SRC
 
 #+RESULTS:
