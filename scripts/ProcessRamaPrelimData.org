@@ -75,8 +75,7 @@ p.s. The 10m current data will be posted later, - I'll let you know when those a
 
 #+RESULTS:
 
-* RAMA13 (ra-107)
-** Better method
+* Better method
 Rather than fitting tanh profiles,
 
 1. I manually go in and figure what linear trends in N² need to be subtracted out to minimize number of negative N² points at each depth.
@@ -89,17 +88,21 @@ Rather than fitting tanh profiles,
 
 *** RAMA13
 #+CAPTION: For some reason 40m instrument is not corrected. Density differences between 40m and 60m instruments look fine, no negative N² so nothing obvious that needs to be corrected.
-[[file:images/fix-RAMA13-N2.png]]
+[[file:../RamaPrelimProcessed/fixed-RAMA13-N2.png]]
 
 #+CAPTION: nothing obviously different in salinity contours. Overlaid black contour is the correction
-[[file:images/fix-RAMA13-sal.png]]
+[[file:../RamaPrelimProcessed/fixed-RAMA13-sal.png]]
 
 *** RAMA14
 #+CAPTION: RAMA14
-[[file:images/fix-RAMA14-N2.png]]
+[[file:../RamaPrelimProcessed/fixed-RAMA14-N2.png]]
 
 #+CAPTION: RAMA14
-[[file:images/fix-RAMA14-sal.png]]
+[[file:../RamaPrelimProcessed/fixed-RAMA14-sal.png]]
+
+#+CAPTION: Whatever I'm doing is definitely reducing N² bias at all depths. Reduces salinity bias at [60m, 40m] and makes it worse at [10m, 20m]. Ideally, we want red line in second panel to be all 0s (last mooring timestep agrees perfectly with CTD downcast).
+[[file:../RamaPrelimProcessed/RAMA14-corrected-CTD.png]]
+* RAMA13 (ra-107)
 ** Read data
 #+BEGIN_quote
   I'd apply a /pre-to-post-cal linear interpolation/ across the data to correct for large-scale drifts (i.e. the first data value in the interpolated output would have a pre-cal applied, while the last value would have a post-cal applied, with the values interpolated in between).
