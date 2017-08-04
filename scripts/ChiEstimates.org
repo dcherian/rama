@@ -35,7 +35,43 @@ import moor.moor as moor
 #+CAPTION: χpod locations for ASIRI/EBOB/MesoBOB
 [[file:~/ebob/MixingmapASIRIPiston.png]]
 
-* RAMA13 (ra-107)
+* 12N
+** full record
+
+#+BEGIN_SRC ipython :session
+%matplotlib inline
+
+import moor.moor as moor
+import chipy.chipy as chipy
+
+importlib.reload(moor)
+importlib.reload(chipy)
+
+import os
+if 'rama' not in os.getcwd():
+    os.chdir('/home/deepak/rama/scripts/')
+
+ra12 = moor.moor(90, 12, 'RAMA 12N | 2013', '../RAMA13/')
+ra12.AddChipod(526, 15, 'mm', '2017-07-10.mat')
+ra12.AddChipod(527, 30, 'mm', '2017-07-10.mat')
+ra12.AddChipod(811, 30, best='mm1', dir='../RAMA14/')
+# ra12.ReadMet('../RAMA13/rama_mooring_data/', WindType='pmel')
+ra12.ReadMet(WindType='sat')
+ra12.ReadCTD('../RamaPrelimProcessed/RAMA13.mat', 'ramaprelim')
+ra12.ReadCTD('../RamaPrelimProcessed/RAMA14.mat', 'ramaprelim')
+ra12.AddSpecialTimes('Hudhud', '2014-Oct-08', '2014-Oct-11')
+#+END_SRC
+
+#+RESULTS:
+
+#+BEGIN_SRC ipython :session :file images/ra12-summary.png
+ra12.Plotχpods()
+#+END_SRC
+
+#+RESULTS:
+[[file:images/ra12-summary.png]]
+
+** 2014 (RAMA13/ra-107)
 |------------+------------+-----------------+----------------+------+---------|
 | Section    | Dir        | Vel             | S              | Tz   | Compass |
 |------------+------------+-----------------+----------------+------+---------|
@@ -51,7 +87,7 @@ Notes on above:
 - Unsure what salinity I used for 2017-04-07. The big difference between that and 2017-04-12 is the N² time series. N^2 drift screws up χ estimate
 
 - Very sure that 2017-04-12 used hourly filtered 10min salinity.
-** full mooring
+*** full mooring
 
 1. Looks like dS/dz is as important as dT/dz in N².
 2. For *30m* χpod, using *10m* mooring velocity instead of pitot makes basically no difference.
@@ -59,10 +95,13 @@ Notes on above:
 #+CAPTION: Not recreating Sally's Hudhud results exactly; but very close. +Could be different N²+ My salinity & hence N² is at 10min resolution (noisier); hers is daily!
 [[file:images/cyclone-jq-sally-me.png]]
 
+#+BEGIN_COMMENT
 Try a stacked histogram like
 [[file:~/work/good-vis/joyplot.jpeg]]
 or
 [[file:~/work/good-vis/joyplot2.jpeg]]
+#+END_COMMENT
+
 #+BEGIN_SRC ipython :session :file images/temp/py3052_Zd.png
 pod = ra12.χpod[526];
 self = pod;
@@ -97,11 +136,12 @@ ax.spines['left'].set_bounds(1, 12)
 # limx = ax.get_xticks()
 #ax.spines['bottom'].set_bounds(limx[1], limx[-2])
 #+END_SRC
-
+#+CAPTION: Try stacking histograms
 #+RESULTS:
 [[file:images/temp/py3052_Zd.png]]
 
 
+#+NAME: read-ra12
 #+BEGIN_SRC ipython :session
 %matplotlib inline
 
@@ -123,16 +163,19 @@ ra12.ReadCTD('../RamaPrelimProcessed/RAMA13.mat', 'ramaprelim')
 ra12.AddSpecialTimes('Hudhud', '2014-Oct-08', '2014-Oct-11')
 #+END_SRC
 
+#+RESULTS: read-ra12
+
 #+RESULTS:
 
 #+BEGIN_SRC ipython :async t :session :file images/rama13-summary.png
 importlib.reload(chipy)
 
 filter_len = 3600*24
-ax = ra12.Plotχpods(filter_len=filter_len)
+ax, hT, hcbar = ra12.Plotχpods(filter_len=filter_len)
 
-ax[-3].set_ylim([1e-10, 1e-5])
-ax[-1].set_ylim([-100, 100])
+hT.set_clim([23, 32])
+ax['χ'].set_ylim([1e-10, 1e-5])
+ax['Jq'].set_ylim([-100, 100])
 #+END_SRC
 #+CAPTION: Daily averages of τ, N², J_q; daily running median of χ, K_T. min N² = 3e-6. Green is χ calculated with pitot velocity.
 #+RESULTS:
@@ -226,7 +269,7 @@ ax.legend(['RAMA 12N', 'Tropflux daily'])
 #+RESULTS:
 [[file:images/ra12n-winds.png]]
 
-*** datashader test :noexport:
+**** datashader test                                            :noexport:
 #+BEGIN_SRC ipython :session    :file images/temp/py12159_Dn.png
 
 # test out TS plot
@@ -258,7 +301,7 @@ img = tf.shade(agg, cmap=['lightblue', 'darkblue'])
 #+END_SRC
 
 #+RESULTS:
-** MISO signals?
+*** MISO signals?
 #+BEGIN_SRC ipython :session
 %matplotlib inline
 
@@ -322,20 +365,31 @@ dcpy.util = importlib.reload(dcpy.util)
 dcpy.ts = importlib.reload(dcpy.ts)
 fbands = [1/90,  # 90 day resonance?
           1/(2*np.pi/dcpy.oceans.inertial(12)/86400),  # f_0
-          AliasFreq(1/(12.42/24), 1), # M_2 alias
+          dcpy.ts.AliasFreq(1/(12.42/24), 1), # M_2 alias
           1/12,
           1/2.15]
-ax = ra12.PlotFluxCoherence(metvar='Jq', nsmooth=5, multitaper=True,
+ax = ra12.PlotMetCoherence(metvars=['Jq', 'wind'], nsmooth=5, multitaper=True,
                             filt='bandpass', fbands=fbands,
                             filter_len=np.array([20, 60])*86400)
 #+END_SRC
-#+CAPTION: (Top left) Band-passed time series. (bottom left) PSD for the unfiltered time series. (Right) coherence amplitude and phase between J_q^0 and J_q^t at both depths. Significance level marked by horizontal line. Vertical lines are frequencies: 90 days, 14.7 day M_2 alias, 12 day peak, inertial period = 2.4 days, 2.1 day peak.
+#+CAPTION: (Top left) Band-passed time series. (top right) PSD for the unfiltered time series. (bottom 4 panels) coherence amplitude and phase between J_q^0 or τ and J_q^t at both depths. Significance level marked by horizontal line. Vertical lines are frequencies: 90 days, 14.7 day M_2 alias, 12 day peak, inertial period = 2.4 days, 2.1 day peak.
 #+RESULTS:
 [[file:images/ra12-jq0-jqt-coherence.png]]
 
-** χ-pod 526
-*** Spectra
-**** Spectrogram
+#+BEGIN_SRC ipython :session :file images/temp/py2881575S.png
+dcpy.ts.PlotSpectrum(ra12.met.Jq0, nsmooth=5)
+ax = plt.gca()
+dcpy.ts.PlotSpectrum(ra12.met.Jq0, multitaper=True)
+plt.legend(['freq band avg', 'multitaper'])
+plt.title('Spectrum of $J_q^0$')
+#+END_SRC
+#+CAPTION: Test out multitaper spectra
+#+RESULTS:
+[[file:images/temp/py2881575S.png]]
+
+*** χ-pod 526
+**** Spectra
+***** Spectrogram
 
 #+BEGIN_SRC ipython :session
 χ = apr20.chi['mm']['chi']
@@ -383,13 +437,13 @@ plt.axhline(24/12.42)
 #+RESULTS:
 [[file:images/temp/py30956fa2.png]]
 
-**** Proto χ spectrum
+***** Proto χ spectrum
 #+CAPTION: [Unit 526, RAMA 12N, 15m] Testing out ~gappy_psd.m~ with different windows. I'm using daily or half-daily means and *filling in 2 day gaps*
 [[file:images/526-chi-proto-spectra.png]]
 
 #+CAPTION: spectrogram of temp with N² overlaid.
 [[file:images/526-temp-spectrogram.png]]
-*** Choosing Tz
+**** Choosing Tz
 
 #+BEGIN_SRC ipython :session    :file images/526-chi-change-Tz.png
 
@@ -428,7 +482,7 @@ plt.axhline(24/12.42)
 #+CAPTION: Use χ calculated with mooring N². Calculate K_T with different dT/dz
 #+RESULTS:
 [[file:images/526-chi-change-Tz.png]]
-*** 2017-07-09
+**** 2017-07-09
 
 #+BEGIN_SRC ipython :session  :exports both
 import chipy.chipy as chipy
@@ -510,7 +564,7 @@ plt.show()
 #+RESULTS:
 [[file:images/compare-sally-summary.png]]
 
-*** 2017-04-20
+**** 2017-04-20
 
 [[file:images/N2-fit.png]]
 
@@ -542,12 +596,12 @@ apr20.CalcKT()
 
 #+RESULTS:
 
-**** TS relation + Tz_i
+***** TS relation + Tz_i
 
 #+BEGIN_SRC ipython :session    :file images/temp/py30956onU.png
 apr20.CompareEstimates('chi', 'mm1', 'mi11');
 #+END_SRC
-**** Compare with sally's estimate - looks fine.
+***** Compare with sally's estimate - looks fine.
 Reasons for differences:
 1. N² drift + my N² is nearly 0 for large chunks of time due to the fitting.
 2. different T_z used for masking: +I always use internal.+ I think she's using mooring. There are differnces even if I match her ~min_dTdz=1e-3~
@@ -623,7 +677,7 @@ plt.show()
 #+RESULTS:
 [[file:images/compare-sally-summary.png]]
 
-*** 2017-04-12 :noexport:
+**** 2017-04-12                                                 :noexport:
 #+BEGIN_SRC ipython :session
 
 import chipy.chipy as chipy
@@ -687,7 +741,7 @@ The difference is N² but why is χ higher for higher N^2?
 
 #+CAPTION: For Apr07 estimate, use_TS_slope = 1 i.e. using Johannes' method of fitting T-S slope. For Apr12, I was doing the simple difference.
 [[file:images/526-apr7-apr12-N2.png]]
-*** 2017-04-07 :noexport:
+**** 2017-04-07                                                 :noexport:
  | 10-min *unfiltered*  salinity | mooring dT/dz |
 
 #+BEGIN_SRC ipython :session
@@ -697,7 +751,7 @@ c526.LoadSallyChiEstimate('../sally/chi_analysis_bkgrnd_Feb5/deglitched/mean_chi
 #+END_SRC
 
 #+RESULTS:
-**** test filtering
+***** test filtering
 #+BEGIN_SRC ipython :session   :file images/temp/py172156XN.png
 
   w, h = mpl.figure.figaspect(1/1.618)
@@ -709,13 +763,13 @@ c526.LoadSallyChiEstimate('../sally/chi_analysis_bkgrnd_Feb5/deglitched/mean_chi
 #+RESULTS:
 [[file:images/temp/py172156XN.png]]
 
-**** scatter χ vs. velocity
+***** scatter χ vs. velocity
 
 #+BEGIN_SRC ipython :session    :file images/chi-velocity-526.png
 
 
 #+END_SRC
-**** ~mm1~ vs. sally
+***** ~mm1~ vs. sally
 
 Seems to agree fine. My estimates tend to be noisier; this is probably because of salinity spiking --- this estimate uses unfiltered 10-min salinity.
 #+BEGIN_SRC ipython :session    :file images/chi-526-prelimsal-mm1-sally.png
@@ -728,7 +782,7 @@ Seems to agree fine. My estimates tend to be noisier; this is probably because o
 
 #+RESULTS:
 [[file:images/chi-526-prelimsal-mm1-sally.png]]
-**** ~mm1~ vs. ~mm2~
+***** ~mm1~ vs. ~mm2~
 #+BEGIN_SRC ipython :session    :file images/chi-526-prelimsal-mm1-mm2.png
   c526.CompareEstimates('chi', 'mm1', 'mm2', filter_len=24*60+1)
 #+END_SRC
@@ -736,7 +790,7 @@ Seems to agree fine. My estimates tend to be noisier; this is probably because o
 #+RESULTS:
 [[file:images/chi-526-prelimsal-mm1-mm2.png]]
 
-**** Sally T1 vs. T2
+***** Sally T1 vs. T2
 #+BEGIN_SRC ipython :session    :file images/chi-526-sally-mm1-mm2.png
 c526.CompareEstimates('chi', 'sally1', 'sally2', filter_len=5*24*6+1)
 #+END_SRC
@@ -744,7 +798,7 @@ c526.CompareEstimates('chi', 'sally1', 'sally2', filter_len=5*24*6+1)
 #+RESULTS:
 [[file:images/chi-526-sally-mm1-mm2.png]]
 
-**** Distributions
+***** Distributions
 
 #+BEGIN_SRC ipython :session    :file images/temp/py12676O0V.png
 
@@ -752,8 +806,8 @@ chi = c526.chi['mm1']['chi'][:].squeeze()
 
 
 #+END_SRC
-*** first try :noexport:
-**** ~mm1~ and ~mi11~ agree really well.
+**** first try                                                  :noexport:
+***** ~mm1~ and ~mi11~ agree really well.
 #+BEGIN_SRC ipython :session    :file images/RAMA13-chi-compare-526-mm1-mi11.png
   c526.CompareEstimates('chi', 'mm1', 'mi11')
 #+END_SRC
@@ -768,7 +822,7 @@ c526.CompareEstimates('KT', 'mm1', 'mi11')
 #+RESULTS:
 [[file:images/RAMA13-KT-compare-mm1-mi11.png]]
 
-**** ~mi11~ and ~mi22~ disagree quite a lot!
+***** ~mi11~ and ~mi22~ disagree quite a lot!
 #+BEGIN_SRC ipython :session    :file images/RAMA13-chi-compare-526-mi11-mi22.png
 
 c526.CompareEstimates('chi', 'mi11', 'mi22')
@@ -786,7 +840,7 @@ c526.CompareEstimates('KT', 'mi11', 'mi22')
 #+RESULTS:
 [[file:images/RAMA13-kt-compare-526-mi11-mi22.png]]
 
-**** ~mi11~ and ~pi11~ agree well - but pitot voltage drifts!
+***** ~mi11~ and ~pi11~ agree well - but pitot voltage drifts!
 This is with the 40-day high pass filtered pitot but I forgot to add back the 40-day mean.
 
 #+BEGIN_SRC ipython :session    :file images/RAMA13-chi-compare-526-mi11-pi11.png
@@ -807,7 +861,7 @@ c526.CompareEstimates('KT', 'mi11', 'pi11', filter_len=24*60)
 #+RESULTS:
 [[file:images/RAMA13-kt-compare-526-mi11-pi11.png]]
 
-**** masking
+***** masking
 
 #+BEGIN_SRC ipython :session  :file images/temp/py172156XN.png
 
@@ -835,7 +889,7 @@ c526.CompareEstimates('KT', 'mi11', 'pi11', filter_len=24*60)
 
 #+RESULTS:
 [[file:images/temp/py172156XN.png]]
-** χ-pod 527
+*** χ-pod 527
 
 #+CAPTION: Pitot tube dies in June and temperature dies by October  (;´༎ຶД༎ຶ`)
 [[file:~/rama/RAMA13/quick_summary/527/summary1_527.png]]
@@ -885,7 +939,24 @@ c527.CompareEstimates('KT', 'pm1', 'pm2', filter_len=86400)
 
 #+RESULTS:
 [[file:images/temp/py12676aIv.png]]
-* RAMA14 (ra-122)
+** 2015 (RAMA14/ra-122)
+
+#+BEGIN_SRC ipython :session
+import chipy.chipy as chipy
+import importlib
+chipy = importlib.reload(chipy)
+
+c811 = chipy.chipod('../RAMA14/data/', '811', best='mm1')
+#+END_SRC
+
+#+RESULTS:
+
+#+BEGIN_SRC ipython :session :file images/temp/811-summary.png
+c811.Summarize(filter_len=86400)
+#+END_SRC
+
+#+RESULTS:
+[[file:images/temp/811-summary.png]]
 
  [[file:images/rama1314-T-s-ρ.png]]
 
