@@ -12,6 +12,7 @@ import dcpy.plots
 import dcpy.util
 
 
+# preliminary data processing
 def Initialize(name, fname):
 
     # setup a mooring dictionary
@@ -133,7 +134,8 @@ def ReadPrelimData(rama, fname):
         rama[var + '-pre'] = ramapre[var]
         rama['date'] = ramapre['date']
         try:
-            ramapost = np.loadtxt('../TAO_raw/postcal/sal' + fname + 'a.flg',
+            ramapost = np.loadtxt('../TAO_raw/postcal/'
+                                  + var + fname + 'a.flg',
                                   skiprows=5, dtype=dtype,
                                   converters=converters)
             rama[var + '-post'] = ramapost[var]
@@ -141,7 +143,8 @@ def ReadPrelimData(rama, fname):
             rama[var + '-post'] = rama[var + '-pre']
 
     [sal, cond, temp, dens] = DefineDataTypes()
-    window_len = 13
+    window_len = 12
+    wlb2 = np.int(window_len/2)
 
     cnv = {0: ProcessDate}
     for jj in np.arange(1, 7):
@@ -154,8 +157,6 @@ def ReadPrelimData(rama, fname):
     for jj in np.arange(1, 14):
         cnv[jj] = Clean
     ReadFile(rama, 'temp', fname, temp, cnv)
-
-    rama['hr-time'] = rama['date'][0::window_len/2]
 
     # ########### Interpolate and convert to dictionaries
     Ntime = len(rama['date'])
@@ -184,15 +185,15 @@ def ReadPrelimData(rama, fname):
 
         # filter hourly
         rama['temp-hr'][depth] = smooth(rama['temp'][depth],
-                                        window_len)[0::window_len/2]
+                                        window_len)[0::wlb2]
         rama['sal-hr'][depth] = smooth(rama['sal'][depth],
-                                       window_len)[0::window_len/2]
+                                       window_len)[0::wlb2]
         rama['dens-hr'][depth] = smooth(rama['dens'][depth],
-                                        window_len)[0::window_len/2]
+                                        window_len)[0::wlb2]
 
-    rama['hr-time'] = rama['date'][0::window_len/2]
+    rama['hr-time'] = rama['date'][0::wlb2]
 
-    ReadDailyData(rama)
+    # ReadDailyData(rama)
 
     return rama
 
@@ -471,15 +472,15 @@ def smooth(x, window_len=11, window='hanning'):
         raise ValueError("Window is on of 'flat', 'hanning',"
                          + "'hamming', 'bartlett', 'blackman'")
 
-    s = np.r_[x[window_len-1:0:-1], x, x[-1:-window_len:-1]]
+    s = np.r_[x[window_len:0:-1], x, x[-1:-window_len-1:-1]]
 
     if window == 'flat':  # moving average
-        w = np.ones(window_len, 'd')
+        w = np.ones(window_len+1, 'd')
     else:
-        w = eval('np.'+window+'(window_len)')
+        w = eval('np.'+window+'(window_len+1)')
 
     y = np.convolve(w/w.sum(), s, mode='valid')
-    return y[(window_len/2-1):-(window_len/2+1)]
+    return y[np.int(window_len/2-1):-np.int(window_len/2+1)]
 
 
 def ArgoPlot(rama, date, floatname='5904313'):

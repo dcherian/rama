@@ -543,7 +543,7 @@ rama.SaveRama(ra107)
 #+END_SRC
 
 #+RESULTS:
-* RAMA14 (ra-122)
+* RAMA14 - 12N (ra-122)
 ** Read data
 #+BEGIN_SRC ipython :session :tangle yes :eval never-export :exports results
   rama = importlib.reload(rama)
@@ -693,6 +693,27 @@ Compare10mDyDiff(ra122, 'dens', '')
 
 #+RESULTS:
 
+* RAMA14 - 15N (ra-123)
+** Email from Sonya
+#+BEGIN_QUOTE
+Hi Deepak,
+
+Thank you for the data and notes you sent! I'm planning to be away from the office for the next 2 weeks, but will compare them after I return. I just looked for the ra122 post calibration files and they're unfortunately not available yet, but the CTDs are, so I'll send you the CTDs at least. I don't work with the current meter data, so I just asked my colleague and he checked into it and found that we do have velocity data from ra122 and ra123, but he hasn't processed them yet. With your request, he has them on his list now and will get them to you within the next month or two...
+
+Regarding the ra123 (15n90e, 12/2014-3/2016) data, I checked and there are no postcals yet (the instruments often remain in India for over a year before they're sent back to us and we can post cal them). There are also no CTDs yet. However, at an urgent request earlier this year, I'd already gone ahead and processed the data without CTDs and post cals, so I can send the results to you if you'd like them. Alternatively I can just send you the initial pre-calibrated files if you'd prefer to process them yourself... Actually, since I won't be here for the next 2 weeks, I'll just post all of the files (precal and final) on the same ftp site so you can download any of them. The final files we release are hourly salc~.hry and daily salc~.davg files, and I'll also post the adjusted ~.adj 10-minute data (which are created prior to 13-point hanning filtering that converts them to hourly). I'll put them into a "final_but_no_postcals" folder under the main site:
+ ftp://ftp.pmel.noaa.gov/OCRD/tao/ForDeepak/July21_2017/
+I just posted them all, so you should be able to retrieve them now...
+
+Take care and I hope you'll have a good weekend!
+
+-Sonya
+#+END_QUOTE
+
+The adjusted data looks good at the χpod depths.
+#+CAPTION: N² using adjusted data from Sonya.
+[[file:../images/RAMA14-15N-N2.png]]
+#+CAPTION:The corrections are all over the place!
+[[file:../images/RAMA14-15N-corrections.png]]
 * RAMA13 & RAMA14
 ** Property plots
 
