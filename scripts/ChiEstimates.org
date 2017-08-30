@@ -20,13 +20,19 @@
 ** Summarize
 #+CALL: read-ra12()
 #+NAME: ra12-summary
-#+ATTR_HTML: :style margin-left:-25%;max-width:150%
-#+RESULTS:
+#+BEGIN_SRC ipython :session :file images/ra12-summary.png
+ax = ra12.Plotχpods()
+ax['Jq'].set_ylim([-100, 100])
+ax['S'].set_ylim([32, 35.5])
+ax['N2'].set_ylim([0, 8])
+#+END_SRC
+
+#+RESULTS: ra12-summary
 [[file:images/ra12-summary.png]]
 
 #+CALL: read-ra12()
 #+BEGIN_SRC ipython :session :file images/rama12n-kt-boxplot.png
-fl = None
+fl = 86400
 
 plt.figure(figsize=(8.5, 5.5))
 
@@ -43,12 +49,12 @@ ax1.set_title('RAMA 12N 30m')
 
 plt.tight_layout()
 #+END_SRC
-#+CAPTION: Distribution of 5 minute averages of K_T.
+#+CAPTION: Distribution of daily averages of K_T.
 #+RESULTS:
 [[file:images/rama12n-kt-boxplot.png]]
 
 
-How much J_q^t is needed to satisfy 1D balance? O(100 W/m²)!
+- How much J_q^t is needed to satisfy 1D balance? O(100 W/m²)!
 
 #+BEGIN_SRC ipython :session :file images/temp/py29463EJl.png
 ra12.Budget()
@@ -56,6 +62,66 @@ ra12.Budget()
 
 #+RESULTS:
 [[file:images/temp/py29463EJl.png]]
+
+** Daily signals
+#+CALL: read-ra12()
+#+BEGIN_SRC ipython :session :file images/ra12-daily.png
+import dcpy.ts
+
+ax = ra12.Plotχpods(filter_len=3600, pods=[526,527], filt='hann')
+
+ax['Jq0'].set_ylim([-500, 700])
+ax['Jq'].set_ylim([-100, 100])
+ax['T'].set_ylim([26.85, 27.75])
+ax['S'].set_ylim([33.5, 34])
+ax['N2'].set_ylim([0, 0.5])
+ax['Tz'].set_ylim([-1e-2, 1e-2])
+ax['Kt'].set_ylim([1e-6, 1e-2])
+
+ax['v'].cla()
+ax['v'].plot(ra12.vel.time, spdband)
+ax['v'].xaxis_date()
+
+ax['met'].set_xlim([dt.datetime.datetime(2014, 1, 25),
+                    dt.datetime.datetime(2014, 2, 3)])
+
+ax['v'].set_ylim([-0.1, 0.1])
+plt.gcf().autofmt_xdate()
+#+END_SRC
+
+#+RESULTS:
+[[file:images/ra12-daily.png]]
+
+Is there a diurnal jet? Looks like it.
+#+BEGIN_SRC ipython :session :file images/temp/py29463OUH.png
+import scipy.signal as signal
+fs = 1/2.0/24.0  # 30 min = 48 per day
+nyq = 0.5 * fs
+cutoff = (1/2.5) / nyq
+#b, a = signal.butter(4,1/cutoff, btype='high')
+#uhi = dcpy.ts.GappyFilter(ra12.vel.u, b, a, 30)
+#vhi = dcpy.ts.GappyFilter(ra12.vel.v, b, a, 30)
+#spdhi = dcpy.ts.GappyFilter(spd, b, a, 30)
+
+spdband = dcpy.ts.BandPassButter(spd, [1/1.5, 1/0.7],
+                                 dt=30.0/60.0/24.0, order=3)
+
+dcpy.ts.PlotSpectrum(spd,
+                     dt=30.0/24.0/60.0, nsmooth=[5, 10, 20, 40],
+                     breakpts=[0.1, 2, 5, 10])
+dcpy.ts.PlotSpectrum(spdband, ax=plt.gca(),
+                     dt=30.0/24.0/60.0, nsmooth=5)
+
+plt.ylim([10**-5, 1])
+dcpy.plots.linex(dcpy.ts.TidalAliases(dt=30.0/24.0/60.0)['M2'] \
+                 ,* np.array([1, 2, 3, 4]))
+dcpy.plots.linex([1, 1/2.4])
+
+plt.title('PSD(|v$_{10m}$|)')
+#+END_SRC
+#+CAPTION: f_0, daily, M_2, M_2*2, M_2*3, M_2*4
+#+RESULTS:
+[[file:images/temp/py29463OUH.png]]
 
 ** Compare 2014 to 2015
 #+CALL: read-ra12()
