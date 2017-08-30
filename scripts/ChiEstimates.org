@@ -81,6 +81,56 @@ hf.suptitle('RAMA 12N | 30m')
 
 #+RESULTS:
 [[file:images/ra12-30m-χ-summary.png]]
+* 15N 2015 (RAMA14/ra-123)
+#+CALL: read-ra15()
+** Summarize
+#+NAME: ra15-summary
+#+BEGIN_SRC ipython :session :file images/ra15-summary.png
+ax = ra15.Plotχpods()
+ax['Jq'].set_ylim([-100, 100])
+ax['S'].set_ylim([30, 34])
+ax['N2'].set_ylim([0, 7])
+#+END_SRC
+#+ATTR_HTML: :style margin-left:-25%;max-width:150%
+#+RESULTS: ra15-summary
+[[file:images/ra15-summary.png]]
+
+#+CALL: read-ra15()
+#+BEGIN_SRC ipython :session :file images/rama15n-kt-boxplot.png
+ra15.ChipodSeasonalSummary(filter_len=None)
+#+END_SRC
+#+CAPTION: Distribution of 5 minute averages of K_T.
+#+RESULTS:
+[[file:images/rama15n-kt-boxplot.png]]
+
+Check if there's a bias in T_z for 2015. There is! 20m temp agrees very well with CTD downcast. Make T at 10m warmer by 0.05?
+
+#+BEGIN_SRC ipython :session :file images/ra15n-temp-offset.png
+plt.figure(figsize=(11.5, 4.5))
+ds = nc.Dataset('../data/t15n90e_10m.cdf')
+T = ds['T_20']
+time = ds['time'][:]/24/60 + dt.date2num(dt.datetime.datetime(2008,10,19,15,00,0))
+
+dT = (np.squeeze(T[:, 2, :, :] - T[:, 4, :, :]))
+dT[abs(dT) > 10] = np.nan
+
+for year in range(2012, 2016):
+    t0 = dt.date2num(dt.datetime.datetime(year, 1, 1, 0, 0, 0))
+    t1 = dt.date2num(dt.datetime.datetime(year+1, 1, 1, 0, 0, 0))
+
+    mask = np.logical_and(time <= t1, time >= t0)
+    plt.plot(time[mask][::24], dT[mask][::24]/10, linewidth=0.5)
+   #  dcpy.plots.hist(dT[mask], normed=True, label=str(year))
+
+plt.gca().xaxis_date()
+plt.title('RAMA 15N dT/dz = ($T_{10m} - T_{20m}$)/10')
+plt.ylim([-5e-2, 5e-2])
+dcpy.plots.liney([0, -5e-3])
+dcpy.plots.linex(dt.date2num(dt.datetime.datetime(2014, 12, 6)))
+#+END_SRC
+
+#+RESULTS:
+[[file:images/ra15n-temp-offset.png]]
 
 * 12N 2014 (RAMA13/ra-107)
 |------------+------------+-----------------+----------------+------+---------|
@@ -940,20 +990,6 @@ plt.show()
 [[file:images/temp/rama14-χ-summary.png]]
 
  [[file:images/rama1314-T-s-ρ.png]]
-
-* 15N 2015 (RAMA14/ra-123)
-#+CALL: read-ra15()
-** Summarize
-#+NAME: ra15-summary
-#+BEGIN_SRC ipython :session :file images/ra15-summary.png
-ax = ra15.Plotχpods()
-ax['Jq'].set_ylim([-200, 200])
-ax['S'].set_ylim([30, 34])
-ax['N2'].set_ylim([0, 7])
-#+END_SRC
-#+ATTR_HTML: :style margin-left:-25%;max-width:150%
-#+RESULTS: ra15-summary
-[[file:images/ra15-summary.png]]
 
 * Sally's processing:
 1s estimate -> min_dTdz=1e-3 -> 1 minute averages
