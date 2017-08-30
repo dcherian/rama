@@ -977,8 +977,11 @@ ra12.AddChipod(526, 15, 'mm', 'Turb-avg.mat')
 ra12.AddChipod(527, 30, 'mm', 'Turb-avg.mat')
 ra12.AddChipod(810, 15, 'mm', 'Turb-avg.mat', dir='../RAMA14/')
 ra12.AddChipod(811, 30, 'mm1', 'Turb-avg.mat', dir='../RAMA14/')
-# ra12.ReadMet('../RAMA13/rama_mooring_data/', WindType='pmel')
-ra12.ReadMet(WindType='sat')
+ra12.ReadMet('../data/met12n90e_10m.cdf', WindType='pmel')
+ra12.ReadMet('../data/jq0_12n90e_hr.mat', FluxType='merged')
+ra12.ReadVel('../data/cur12n90e_30m.cdf', FileType='pmel')
+# ra12.ReadMet('../data/qnet12n90e_hr.cdf', FluxType='pmel')
+# ra12.ReadMet(WindType='sat')
 ra12.ReadCTD('../RamaPrelimProcessed/RAMA13-corrected.mat', 'ramaprelim')
 ra12.ReadCTD('../RamaPrelimProcessed/RAMA14-12N-corrected.mat',
              'ramaprelim')
@@ -998,7 +1001,6 @@ ra12.AddSeason([810, 811], 'SW→NE', '2015-Oct-15', '2015-Dec-01')
 
 ra12.AddSpecialTimes([810, 811], 'FW2', '2015-Apr-05', '2015-Apr-10')
 ra12.AddSpecialTimes([810, 811], 'FW3', '2015-Oct-28', '2015-Nov-05')
-
 #+END_SRC
 
 #+NAME: read-ra15
@@ -1017,13 +1019,17 @@ if 'rama' not in os.getcwd():
 ra15 = moor.moor(90, 15, 'RAMA 15N', '../RAMA14/')
 ra15.AddChipod(813, 15, 'mm', 'Turb-avg.mat')
 ra15.AddChipod(814, 30, 'mm1', 'Turb-avg.mat')
-# ra12.ReadMet('../RAMA13/rama_mooring_data/', WindType='pmel')
+ra15.ReadMet('../data/met15n90e_10m.cdf', WindType='pmel')
 ra15.ReadMet(WindType='sat')
 ra15.ReadCTD('../RamaPrelimProcessed/RAMA14-15N.mat', 'ramaprelim')
 
 ra15.AddSeason([813, 814], 'NE', '2014-Dec-01', '2015-Mar-01')
 ra15.AddSeason([813, 814], 'NE→SW', '2015-Mar-01', '2015-May-15')
 ra15.AddSeason([813, 814], 'SW', '2015-May-15', '2015-Oct-14')
+
+ra15.AddSpecialTimes([813], 'FW4', '2015-Aug-12', '2015-Aug-20')
+ra15.AddSpecialTimes([813, 814], 'Storm1', '2015-Jul-03', '2015-Jun-25')
+
 #+END_SRC
 
 #+NAME: read-ra12-2015
