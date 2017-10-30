@@ -290,9 +290,40 @@ M2 = 10*np.sin(2*π/TM2 * t)
 
 ax = plt.gca()
 dcpy.ts.PlotSpectrum(M2, nsmooth=4, multitaper=False, ax=ax)
-dcpy.ts.PlotSpectrum(M2, nsmooth=20, multitaper=True, ax=ax)
+dcpy.ts.PlotSpectrum(M2, nsmooth=4, multitaper=True, ax=ax)
 dcpy.plots.linex(1/TM2)
 #+END_SRC
 
 #+RESULTS:
 [[file:images/temp/py28335nlb.png]]
+** sign of coherence phase
+#+BEGIN_SRC ipython :session :file images/temp/py29463xPN.png
+y0 = np.sin(np.arange(5000) * 2*np.pi/100) + np.random.randn(5000)
+y1 = np.sin(np.arange(5000) * 2*np.pi/100 + np.pi/4) + np.random.randn(5000)
+
+dcpy.ts.PlotCoherence(y0, y1, multitaper=True)
+dcpy.plots.linex([1/100.0, 1/200.0, 2*np.pi/100])
+plt.gca().set_xscale('log')
+#+END_SRC
+
+#+RESULTS:
+[[file:images/temp/py29463xPN.png]]
+** Test rotary spectra
+#+BEGIN_SRC ipython :session :file images/temp/py29463UuM.png
+t = np.arange(10001)
+π = np.pi
+w = np.cos(2*π/10 * t) + 1j * np.sin(2*π/10 * t) \
+    + np.cos(2*π/100 * t) - 1j * np.sin(2*π/100 * t)
+
+cw, ccw, freq, _, _ = dcpy.ts.RotaryPSD(w, multitaper=True)
+plt.loglog(freq, cw, freq, ccw)
+
+cw, ccw, freq, _, _ = dcpy.ts.RotaryPSD(w, multitaper=False)
+plt.loglog(freq, cw, freq, ccw)
+
+plt.legend(['cw', 'ccw'])
+dcpy.plots.linex([1/10, 1/100])
+#+END_SRC
+
+#+RESULTS:
+[[file:images/temp/py29463UuM.png]]
