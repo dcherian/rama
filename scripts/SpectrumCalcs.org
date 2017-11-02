@@ -324,3 +324,29 @@ dcpy.plots.linex([1/10, 1/100])
 
 #+RESULTS:
 [[file:images/temp/py29463UuM.png]]
+** Test ~apply_along_axis~
+#+BEGIN_SRC ipython :session :file images/temp/img3907Ewz.png
+import dcpy.ts
+
+dt = 1
+t = np.arange(0, 10001, dt)  # in days
+freqs = np.arange(5,100,10)
+peaks = np.sum(np.sin(2*π/np.reshape(freqs, (len(freqs), 1)) * t), axis=0)
+syn = dcpy.ts.synthetic(len(t), dt, 1, -5)
+syn/= syn.max()
+syn2 = dcpy.ts.synthetic(len(t), dt, 1, 5)
+syn2/= syn2.max()
+ts = 120*syn + peaks
+ts2d = np.broadcast_to(ts, (13, 5, len(ts)))
+
+b, a = dcpy.ts.BandPassButter(ts, [1/30.0, 1/60.0], dt=dt, returnba=True)
+
+old = dcpy.ts.oldGappyFilter(ts, b, a, num_discard='auto')
+new = np.apply_along_axis(dcpy.ts.GappyFilter, -1, ts2d,
+                          b, a, num_discard='auto')[4, 4, :].squeeze()
+
+assert(np.all(np.equal(old[~np.isnan(old)], new[~np.isnan(new)])))
+#+END_SRC
+
+#+RESULTS:
+[[file:images/temp/img3907Ewz.png]]
