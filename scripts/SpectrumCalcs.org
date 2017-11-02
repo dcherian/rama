@@ -1,9 +1,6 @@
-#+OPTIONS: html5-fancy:t tex:t broken-links:mark H:5
-#+HTML_DOCTYPE: html5
-#+HTML_CONTAINER: div
-#+LATEX_CLASS: dcnotebook
-#+HTML_HEAD: <link rel="stylesheet" href="notebook.css" type="text/css" />
-#+PROPERTY: header-args :eval never-export :tangle yes
+#+TITLE: Testing out my spectra code
+#+SETUPFILE: ~/org/notebook.org
+
 * Test out python functions
 ** Try multiple subsets of a time series
 - [X] generate synthetic time series

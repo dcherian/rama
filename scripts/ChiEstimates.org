@@ -1,16 +1,7 @@
 #+TITLE: RAMA: χ estimates
 #+AUTHOR: Deepak Cherian
 #+DATE: 14 Mar 2017
-
-#+OPTIONS: html-link-use-abs-url:nil html-postamble:auto
-#+OPTIONS: html-preamble:t html-scripts:nil html-style:nil
-#+OPTIONS: html5-fancy:t tex:t broken-links:mark H:5
-#+OPTIONS: toc:2
-#+STARTUP: hideblocks
-#+HTML_DOCTYPE: html5
-#+HTML_CONTAINER: div
-#+LATEX_CLASS: dcnotebook
-#+HTML_HEAD: <link rel="stylesheet" href="notebook.css" type="text/css" />
+#+SETUPFILE: ~/org/notebook.org
 
 * Map
 #+ATTR_HTML: :width 55%
