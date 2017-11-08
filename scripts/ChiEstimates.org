@@ -5,21 +5,23 @@
 
 * Map
 #+ATTR_HTML: :width 55%
-#+CAPTION: χpod locations for ASIRI/EBOB/MesoBOB
+#+CAPTION: χpod locations for ASIRI/EBoB/MISOBOB
 [[file:~/ebob/MixingmapASIRIPiston.png]]
 * 12N full record
 ** Summarize
 #+CALL: read-ra12()
 #+NAME: ra12-summary
 #+BEGIN_SRC ipython :session :file images/ra12-summary.png
-ax = ra12.Plotχpods()
-ax['Jq'].set_ylim([-100, 100])
-ax['S'].set_ylim([32, 35.5])
+ax = ra12.Plotχpods(quiv=False, filt='hann', TSkind='pcolor')
 ax['N2'].set_ylim([0, 8])
+ax['met'].set_xlim(ra12.season[810]['SW'])
 #+END_SRC
-
+#+ATTR_HTML: :class full-width
 #+RESULTS: ra12-summary
 [[file:images/ra12-summary.png]]
+
+#+ATTR_HTML: :class full-width
+[[file:images/rama13-summary-miso.png]]
 
 #+CALL: read-ra12()
 #+BEGIN_SRC ipython :session :file images/rama12n-kt-boxplot.png
@@ -53,8 +55,96 @@ ra12.Budget()
 
 #+RESULTS:
 [[file:images/temp/py29463EJl.png]]
-
 ** Daily signals
+
+1. Tz, N² at 30m < that at 15m consistently
+2. This looks like turbulence mixing near-surface heat downward
+3. This does *not* support the idea that J_q^t is larger at 30m.
+4. There's a bias here because the 15m observes T_z > 1e-3 for much longer than the 30m instrument does. Taking nanmeans biases the daily average.
+5. For now, I am replacing NaNs with 0s; assuming that turbulent heat flux goes to 0 when T_z < 1e-3.
+
+#+CALL: read-ra12()
+#+BEGIN_SRC ipython :session :file images/temp/img246023Dvh.png
+TSkind = 'contour'
+Tlim = [25, 28.1]
+Slim = [32, 35.5]
+t0 = dt.date2num(dt.datetime.datetime(2014, 1, 27))
+t1 = dt.date2num(dt.datetime.datetime(2014, 1, 29))
+
+ax = ra12.Plotχpods(quiv=False, filt='hann', filter_len=1*3600,
+                    TSkind=TSkind, t0=t0, t1=t1)
+
+ax['Jq'].set_ylim([-100, 100])
+ax['N2'].set_ylim([0, 0.5])
+ax['met'].set_xlim([t0, t1])
+
+if TSkind is 'timeseries':
+    ax['T'].set_ylim(Tlim)
+    ax['S'].set_ylim(Slim)
+
+if TSkind is 'pcolor':
+#    ax['Tplot'].set_clim(Tlim)
+    ax['Splot'].set_clim(Slim)
+
+#+END_SRC
+#+ATTR_HTML: :class full-width
+#+RESULTS:
+[[file:images/temp/img246023Dvh.png]]
+
+#+BEGIN_SRC ipython :session :file images/ra12-2014-daily-zoomin.png
+TSkind = 'contour'
+Tlim = [25, 28.1]
+Slim = [32, 35.5]
+t0 = dt.date2num(dt.datetime.datetime(2014, 1, 27))
+t1 = dt.date2num(dt.datetime.datetime(2014, 2, 5))
+
+ax = ra12.Plotχpods(quiv=False, filt='hann', filter_len=1*3600,
+                    TSkind=TSkind, t0=t0, t1=t1)
+
+ax['Jq'].set_ylim([-100, 100])
+ax['N2'].set_ylim([0, 0.5])
+ax['met'].set_xlim([t0, t1])
+
+if TSkind is 'timeseries':
+    ax['T'].set_ylim(Tlim)
+    ax['S'].set_ylim(Slim)
+
+if TSkind is 'pcolor':
+#    ax['Tplot'].set_clim(Tlim)
+    ax['Splot'].set_clim(Slim)
+
+#+END_SRC
+#+ATTR_HTML: :class full-width
+#+RESULTS:
+[[file:images/ra12-2014-daily-zoomin.png]]
+
+#+BEGIN_SRC ipython :session :file images/ra12-2014-winter.png
+TSkind = 'contour'
+Tlim = [25, 28.1]
+Slim = [32, 35.5]
+t0 = dt.date2num(dt.datetime.datetime(2013, 12, 29))
+t1 = dt.date2num(dt.datetime.datetime(2014, 2, 8))
+
+ax = ra12.Plotχpods(quiv=False, filter_len=1*3600, filt='hann',
+                    TSkind=TSkind, t0=t0, t1=t1)
+
+ax['Jq'].set_ylim([-100, 100])
+ax['N2'].set_ylim([0, 2])
+ax['met'].set_xlim([t0, t1])
+
+if TSkind is 'timeseries':
+    ax['T'].set_ylim(Tlim)
+    ax['S'].set_ylim(Slim)
+
+if TSkind is 'pcolor':
+#    ax['Tplot'].set_clim(Tlim)
+    ax['Splot'].set_clim(Slim)
+
+#+END_SRC
+#+ATTR_HTML: :class full-width
+#+RESULTS:
+[[file:images/ra12-2014-winter.png]]
+
 #+CALL: read-ra12()
 #+BEGIN_SRC ipython :session :file images/ra12-daily.png
 import dcpy.ts
@@ -68,24 +158,24 @@ ax['S'].set_ylim([33.5, 34])
 ax['N2'].set_ylim([0, 0.5])
 ax['Tz'].set_ylim([-1e-2, 1e-2])
 ax['Kt'].set_ylim([1e-6, 1e-2])
-
-ax['v'].cla()
-ax['v'].plot(ra12.vel.time, spdband)
-ax['v'].xaxis_date()
-
 ax['met'].set_xlim([dt.datetime.datetime(2014, 1, 25),
                     dt.datetime.datetime(2014, 2, 3)])
 
-ax['v'].set_ylim([-0.1, 0.1])
+# ax['v'].cla()
+# ax['v'].plot(ra12.vel.time, spdband)
+# ax['v'].xaxis_date()
+# ax['v'].set_ylim([-0.1, 0.1])
+
 plt.gcf().autofmt_xdate()
 #+END_SRC
-
+#+ATTR_HTML: :class full-width
 #+RESULTS:
 [[file:images/ra12-daily.png]]
 
-Is there a diurnal jet? Looks like it.
-#+BEGIN_SRC ipython :session :file images/temp/py29463OUH.png
+#+BEGIN_SRC ipython :session :file images/rama13-vel-spectra.png
 import scipy.signal as signal
+from dcpy.util import find_approx
+
 fs = 1/2.0/24.0  # 30 min = 48 per day
 nyq = 0.5 * fs
 cutoff = (1/2.5) / nyq
@@ -94,25 +184,165 @@ cutoff = (1/2.5) / nyq
 #vhi = dcpy.ts.GappyFilter(ra12.vel.v, b, a, 30)
 #spdhi = dcpy.ts.GappyFilter(spd, b, a, 30)
 
-spdband = dcpy.ts.BandPassButter(spd, [1/1.5, 1/0.7],
-                                 dt=30.0/60.0/24.0, order=3)
+# spdband = dcpy.ts.BandPassButter(spd, [1/1.5, 1/0.7],
+#                                 dt=30.0/60.0/24.0, order=3)
 
-dcpy.ts.PlotSpectrum(spd,
-                     dt=30.0/24.0/60.0, nsmooth=[5, 10, 20, 40],
-                     breakpts=[0.1, 2, 5, 10])
-dcpy.ts.PlotSpectrum(spdband, ax=plt.gca(),
-                     dt=30.0/24.0/60.0, nsmooth=5)
+t0 = dt.date2num(dt.datetime.datetime(2013, 12, 1))
+t1 = dt.date2num(dt.datetime.datetime(2014, 12, 1))
+it0 = find_approx(ra12.vel.time, t0)
+it1 = find_approx(ra12.vel.time, t1)
 
-plt.ylim([10**-5, 1])
-dcpy.plots.linex(dcpy.ts.TidalAliases(dt=30.0/24.0/60.0)['M2'] \
-                 ,* np.array([1, 2, 3, 4]))
-dcpy.plots.linex([1, 1/2.4])
+#dcpy.ts.PlotSpectrum(spd[it0:it1],
+#                     dt=30.0/24.0/60.0, nsmooth=[5, 10, 20, 40],
+#                     breakpts=[0.1, 2, 5, 10])
+#dcpy.ts.PlotSpectrum(spdband[it0:it1], ax=plt.gca(),
+#                     dt=30.0/24.0/60.0, nsmooth=5)
 
-plt.title('PSD(|v$_{10m}$|)')
+w = ra12.vel.u + 1j * ra12.vel.v
+_, ax = dcpy.ts.PlotSpectrum(w[it0:it1], twoside=True,
+                             dt=30.0/24.0/60.0, nsmooth=5,
+                             multitaper=False, label='2014-2015',
+                             linewidth=0.5, scale=10)
+
+# maxlen = 20 * 86400 / (30*60)
+# w = dcpy.ts.FillGaps(ra12.vel.u, maxlen=maxlen) \
+#    + 1j * dcpy.ts.FillGaps(ra12.vel.v, maxlen=maxlen)
+
+t0 = dt.date2num(dt.datetime.datetime(2015, 1, 1))
+t1 = dt.date2num(dt.datetime.datetime(2016, 2, 1))
+it0 = find_approx(ra12.vel.time, t0)
+it1 = find_approx(ra12.vel.time, t1)
+
+dcpy.ts.PlotSpectrum(w[it0:it1], twoside=True,
+                     dt=30.0/24.0/60.0, ax=ax, nsmooth=3,
+                     multitaper=False, label='2015-2016',
+                     linewidth=0.5)
+
+dcpy.plots.linex([1/(12.42/24), 1.0, 1/(2.42),
+                  2/(12.42/24), 3/(12.42/24)], ax)
+
+dcpy.plots.FillRectangle([1/30.0, 1/60.0], ax=ax)
+
+plt.gcf().set_size_inches((8.5, 3))
+plt.legend()
 #+END_SRC
-#+CAPTION: f_0, daily, M_2, M_2*2, M_2*3, M_2*4
+#+CAPTION: Lines = f_0, daily, M_2, M_2*2, M_2*3, M_2*4. No obvious peaks between 10 and 100 days. There is a daily peak in spectra of speed for both deployments at 12N. Why does daily freq. look slighly polarized? Spectra are displaced.
 #+RESULTS:
-[[file:images/temp/py29463OUH.png]]
+[[file:images/rama13-vel-spectra.png]]
+
+Try coherence with surface forcing : hmmm...
+There's no daily peak in speed spectra for the extracted time range.
+#+BEGIN_SRC ipython :session :file images/temp/py29463_0A.png
+from dcpy.util import find_approx
+from dcpy.ts import FillGaps
+
+jq0 = FillGaps(ra12.vel.time,
+               np.interp(ra12.vel.time , ra12.met.Jtime, ra12.met.Jq0))
+spd = np.hypot(ra12.vel.u, ra12.vel.v)
+spd = ra12.vel.v
+
+t0 = dt.date2num(dt.datetime.datetime(2014, 1, 22))
+t1 = dt.date2num(dt.datetime.datetime(2014, 2, 2))
+it0 = find_approx(ra12.vel.time, t0)
+it1 = find_approx(ra12.vel.time, t1)
+
+dcpy.ts.PlotCoherence(spd[it0:it1], -jq0[it0:it1]/100, nsmooth=4,
+                      dt=30/60.0/24.0, multitaper=True)
+
+plt.gca().set_xscale('log')
+plt.gca().set_title('+ve = speed leads Jq0')
+plt.gca().set_xlabel('freq (cpd)')
+plt.subplot(311).set_title('Speed vs. Jq0')
+# plt.plot(ra12.met.Jtime, ra12.met.Jq0)
+# plt.xlim([t0, t1])
+# plt.gca().xaxis_date()
+#+END_SRC
+
+#+RESULTS:
+[[file:images/temp/py29463_0A.png]]
+
+Make spectrogram of velocity instead:
+#+BEGIN_SRC ipython :session
+vf, vspec, vt = dcpy.ts.Spectrogram(FillGaps(ra12.vel.time,
+                                             ra12.vel.v),
+                                    20*24*60/30, 2*24*60/30,
+                                    time=ra12.vel.time,
+                                    multitaper=True)
+τf, τspec, τt = dcpy.ts.Spectrogram(FillGaps(ra12.met.τtime, ra12.met.τ),
+                                    20*24*60/10, 2*24*60/10,
+                                    time=ra12.met.τtime,
+                                    multitaper=True)
+#+END_SRC
+
+#+RESULTS:
+
+#+BEGIN_SRC ipython :session :file images/temp/py294633Ev.png
+ax1 = plt.subplot(211)
+plt.pcolormesh(vt, vf, np.log10(vspec.T))
+plt.gca().set_yscale('log')
+plt.colorbar()
+plt.gca().xaxis_date()
+plt.title('velocity')
+plt.gci().set_clim([-6, 2])
+
+plt.subplot(212, sharex=ax1)
+plt.pcolormesh(τt, τf, np.log10(τspec.T))
+plt.gci().set_clim([-6, -1])
+plt.gca().set_yscale('log')
+plt.colorbar()
+plt.title('Wind stress')
+plt.gca().xaxis_date()
+ax1.set_xlim(dt.date2num([dt.datetime.datetime(2013, 11, 29),
+                          dt.datetime.datetime(2014, 11, 29)]))
+plt.gcf().autofmt_xdate()
+plt.tight_layout()
+#+END_SRC
+
+#+RESULTS:
+[[file:images/temp/py294633Ev.png]]
+
+** Search for MISO event?
+#+BEGIN_SRC ipython :session :file images/temp/img3907och.png
+ra12.met.swr.resample('D', 'time', how='mean').plot()
+plt.gcf().set_size_inches((8.5, 3.5))
+plt.gca().set_xlim(ra12.season[526]['SW'])
+#+END_SRC
+#+CAPTION: Daily averaged shortwave radiation
+#+RESULTS:
+[[file:images/temp/img3907och.png]]
+*** halocline uplift
+#+call: read-ra12()
+#+BEGIN_SRC ipython :session :file images/sw-2014.png
+ax = ra12.Plotχpods(quiv=False, filt='hann',
+                    filter_len=1.0*86400.0, TSkind='pcolor')
+plt.gca().set_xlim([dt.datetime.datetime(2014, 5, 1),
+                    dt.datetime.datetime(2015, 1, 1)])
+
+ax['Jq'].set_ylim([-60, 60])
+#+END_SRC
+#+CAPTION: There are a few high-SSS events during the monsoon
+#+RESULTS:
+[[file:images/sw-2014.png]]
+
+#+BEGIN_SRC ipython :session :file images/sw-2015.png
+ax = ra12.Plotχpods(quiv=False, filt='hann',
+                    filter_len=1.2*86400.0, TSkind='pcolor')
+plt.gca().set_xlim(ra12.season[811]['SW'])
+ax['Jq'].set_ylim([-60, 60])
+#+END_SRC
+
+#+RESULTS:
+[[file:images/sw-2015.png]]
+*** Cross-correlations
+#+call: read-ra12()
+
+#+BEGIN_SRC ipython :session :file images/temp/img9554jYo.png
+ra12.LagCorr(filter_len=86400.0, met='tropflux', metvar='lwr',
+             freqs=np.array([1/10.0, 1/80.0])/86400)
+#+END_SRC
+#+CAPTION: Cross-correlation between [10, 80] day band pass filtered daily-averaged met var. and J_q^t. x-axis is lag in days.
+#+RESULTS:
+[[file:images/temp/img9554jYo.png]]
 
 ** Compare 2014 to 2015
 #+CALL: read-ra12()
@@ -124,7 +354,7 @@ ra12.χpod[810].Summarize(filter_len=86400, est='mm1', hfig=hf, dt=365)
 
 hf.suptitle('RAMA 12N | 15m')
 #+END_SRC
-
+#+ATTR_HTML: :class full-width
 #+RESULTS:
 [[file:images/ra12-15m-χ-summary.png]]
 
@@ -135,7 +365,7 @@ ra12.χpod[811].Summarize(filter_len=86400, est='mm1', hfig=hf, dt=365)
 
 hf.suptitle('RAMA 12N | 30m')
 #+END_SRC
-
+#+ATTR_HTML: :class full-width
 #+RESULTS:
 [[file:images/ra12-30m-χ-summary.png]]
 * 15N 2015 (RAMA14/ra-123)
@@ -143,12 +373,12 @@ hf.suptitle('RAMA 12N | 30m')
 ** Summarize
 #+NAME: ra15-summary
 #+BEGIN_SRC ipython :session :file images/ra15-summary.png
-ax = ra15.Plotχpods()
+ax = ra15.Plotχpods(quiv=False)
 ax['Jq'].set_ylim([-100, 100])
 ax['S'].set_ylim([30, 34])
 ax['N2'].set_ylim([0, 7])
 #+END_SRC
-#+ATTR_HTML: :style margin-left:-25%;max-width:150%
+#+ATTR_HTML: :class full-width
 #+RESULTS: ra15-summary
 [[file:images/ra15-summary.png]]
 
@@ -260,19 +490,40 @@ ax.spines['left'].set_bounds(1, 12)
 #+RESULTS:
 [[file:images/temp/py3052_Zd.png]]
 
-
 #+CALL: read-ra12()
+
+#+BEGIN_SRC ipython :session :file images/ra12-15m-χ-summary.png
+ra12.χpod[526].Summarize(filter_len=86400)
+hf = plt.gcf()
+ra12.χpod[810].Summarize(filter_len=86400, est='mm1', hfig=hf, dt=365)
+
+hf.suptitle('RAMA 12N | 15m')
+#+END_SRC
+#+ATTR_HTML: :class full-width
+#+RESULTS:
+[[file:images/ra12-15m-χ-summary.png]]
+
+#+BEGIN_SRC ipython :session :file images/ra12-30m-χ-summary.png
+ra12.χpod[527].Summarize(filter_len=86400)
+hf = plt.gcf()
+ra12.χpod[811].Summarize(filter_len=86400, est='mm1', hfig=hf, dt=365)
+
+hf.suptitle('RAMA 12N | 30m')
+#+END_SRC
 
 #+BEGIN_SRC ipython :session :file images/rama13-summary.png
 importlib.reload(chipy)
 
 filter_len = 3600*24
-ax = ra12.Plotχpods(filter_len=filter_len)
+ax = ra12.Plotχpods(filter_len=filter_len, quiv=False)
 
-ax['χ'].set_ylim([1e-10, 1e-5])
+# ax['χ'].set_ylim([1e-10, 1e-5])
 ax['Jq'].set_ylim([-100, 100])
+ax['met'].set_xlim(dt.datetime.datetime(2013, 12, 1),
+                   dt.datetime.datetime(2014, 12, 1))
 #+END_SRC
 #+CAPTION: Daily averages of τ, N², J_q; daily running median of χ, K_T. min N² = 3e-6. Green is χ calculated with pitot velocity.
+#+ATTR_HTML: :class full-width
 #+RESULTS:
 [[file:images/rama13-summary.png]]
 
@@ -392,12 +643,17 @@ img = tf.shade(agg, cmap=['lightblue', 'darkblue'])
 #+RESULTS:
 ** MISO signals?
 #+CALL: read-ra12()
-
 #+BEGIN_SRC ipython :session :file images/rama13-summary-miso.png
-filter_len = np.array([20, 60])*86400
+filter_len = np.array([10, 80])*86400
 dcpy.ts = importlib.reload(dcpy.ts)
 
-ax = ra12.Plotχpods(filt='bandpass', filter_len=filter_len)
+ax = ra12.Plotχpods(filt='bandpass',
+                    filter_len=filter_len,
+                    TSkind='pcolor', quiv=True,
+                    met='tropflux', fluxvar='lwr',
+                    tau='tropflux')
+
+ax['Kt'].set_ylim([-2.5e-3, 2.5e-3])
 #+END_SRC
 
 #+CAPTION: Band-pass filter looking for MISO signals. We don't lose edges when filtering J_q because it's a 3 year record from Tropflux. Looks like our 30m χpod is at a depth where the "mode structure" of subsurface temperature fluctuations has near-0 amplitude (at least while the instrument was alive - died in Sep-2014). Magnitude of temp anomaly fluctuations (1C) agrees with literature. Overlaid black contours are salinity fluctuations in the pass-band (dashed = negative).
@@ -412,8 +668,6 @@ Nothing at 30m
  - short(er) data record - instrument dies in september
  - not much temp fluctuations at that depth while the instrument was alive (see above).
 
-#+CALL: read-ra12()
-
 #+BEGIN_SRC ipython :session :file images/ra12-jq0-jqt-coherence.png
 dcpy.util = importlib.reload(dcpy.util)
 dcpy.ts = importlib.reload(dcpy.ts)
@@ -422,7 +676,7 @@ fbands = [1/90,  # 90 day resonance?
           dcpy.ts.AliasFreq(1/(12.42/24), 1), # M_2 alias
           1/12,
           1/2.15]
-ax = ra12.PlotMetCoherence(metvars=['Jq', 'wind'], nsmooth=5, multitaper=True,
+ax = ra12.PlotMetCoherence(metvars=['','wind'], nsmooth=5, multitaper=True,
                             filt='bandpass', fbands=fbands,
                             filter_len=np.array([20, 60])*86400)
 #+END_SRC
@@ -431,15 +685,30 @@ ax = ra12.PlotMetCoherence(metvars=['Jq', 'wind'], nsmooth=5, multitaper=True,
 [[file:images/ra12-jq0-jqt-coherence.png]]
 
 #+BEGIN_SRC ipython :session :file images/temp/py2881575S.png
-dcpy.ts.PlotSpectrum(ra12.met.Jq0, nsmooth=5)
+dcpy.ts.PlotSpectrum(ra12.tropflux['netflux'], nsmooth=5)
 ax = plt.gca()
-dcpy.ts.PlotSpectrum(ra12.met.Jq0, multitaper=True)
+dcpy.ts.PlotSpectrum(ra12.tropflux['netflux'], multitaper=True)
 plt.legend(['freq band avg', 'multitaper'])
 plt.title('Spectrum of $J_q^0$')
 #+END_SRC
 #+CAPTION: Test out multitaper spectra
 #+RESULTS:
 [[file:images/temp/py2881575S.png]]
+
+#+BEGIN_SRC ipython :session :file images/temp/img9554MtV.png
+ra12.PlotAllSpectra(filter_len=86400.0, multitaper=True)
+#+END_SRC
+
+#+RESULTS:
+[[file:images/temp/img9554MtV.png]]
+
+** Hudhud
+
+#+CAPTION: Different masking criteria...
+[[file:images/526-hudhud-masking.png]]
+
+#+CAPTION: ∫J_q^t over Hudhud is sensitive to averaging interval! Sally used T_z > 3e-4 & 1 min averages. With that I get ~ -220 W/m² compared to her -193 W/m² --- this difference is due to 10min vs. daily salinity (I think).
+[[file:images/526-hudhud-jqt-sensitivity.png]]
 
 ** χ-pod 526
 *** Funny signals
@@ -541,7 +810,7 @@ plt.axhline(24/12.42)
 *** 2017-07-09
 
 #+BEGIN_SRC ipython :session  :exports both
-import chipy.chipy as chipy
+import chipy
 import importlib
 chipy = importlib.reload(chipy)
 
@@ -640,7 +909,7 @@ This estimate uses the tanh fit to determine N².
 Read data:
 #+BEGIN_SRC ipython :session  :exports both
 
-import chipy.chipy as chipy
+import chipy
 import importlib
 chipy = importlib.reload(chipy)
 
@@ -736,7 +1005,7 @@ plt.show()
 *** 2017-04-12                                                   :noexport:
 #+BEGIN_SRC ipython :session
 
-import chipy.chipy as chipy
+import chipy
 
 apr07 = chipy.chipod('../RAMA13/data/', '526', '2017-04-07.mat')
 apr07.LoadChiEstimates()
@@ -1056,8 +1325,8 @@ plt.show()
 #+BEGIN_SRC ipython :session :results none
 %matplotlib inline
 
-import moor.moor as moor
-import chipy.chipy as chipy
+import moor
+import chipy
 importlib.reload(moor)
 importlib.reload(chipy)
 
@@ -1066,15 +1335,16 @@ if 'rama' not in os.getcwd():
     os.chdir('/home/deepak/rama/scripts/')
 
 ra12 = moor.moor(90, 12, 'RAMA 12N', '../RAMA13/')
-ra12.AddChipod(526, 15, 'mm', 'Turb-avg.mat')
-ra12.AddChipod(527, 30, 'mm', 'Turb-avg.mat')
-ra12.AddChipod(810, 15, 'mm', 'Turb-avg.mat', dir='../RAMA14/')
-ra12.AddChipod(811, 30, 'mm1', 'Turb-avg.mat', dir='../RAMA14/')
+ra12.AddChipod(526, 15, 'mm1', 'Turb.mat')
+ra12.AddChipod(527, 30, 'mm1', 'Turb.mat')
+ra12.AddChipod(810, 15, 'mm', 'Turb.mat', dir='../RAMA14/')
+ra12.AddChipod(811, 30, 'mm1', 'Turb.mat', dir='../RAMA14/')
 ra12.ReadMet('../data/met12n90e_10m.cdf', WindType='pmel')
 ra12.ReadMet('../data/jq0_12n90e_hr.mat', FluxType='merged')
+ra12.ReadMet(FluxType='precip')
+ra12.ReadTropflux('../tropflux/')
 ra12.ReadVel('../data/cur12n90e_30m.cdf', FileType='pmel')
 # ra12.ReadMet('../data/qnet12n90e_hr.cdf', FluxType='pmel')
-# ra12.ReadMet(WindType='sat')
 ra12.ReadCTD('../RamaPrelimProcessed/RAMA13-corrected.mat', 'ramaprelim')
 ra12.ReadCTD('../RamaPrelimProcessed/RAMA14-12N-corrected.mat',
              'ramaprelim')
@@ -1084,7 +1354,7 @@ ra12.AddSeason([526, 527], 'NE→SW', '2014-Feb-15', '2014-May-05')
 ra12.AddSeason([526, 527], 'SW', '2014-May-06', '2014-Sep-24')
 ra12.AddSeason([526, 527], 'SW→NE', '2014-Sep-25', '2014-Dec-12')
 
-ra12.AddSpecialTimes([526, 527], 'FW1', '2014-Jan-14', '2014-Jan-18')
+ra12.AddSpecialTimes([526, 527], 'FW1', '2014-Jan-15', '2014-Jan-19')
 ra12.AddSpecialTimes([526, 527], 'Hudhud', '2014-Oct-08', '2014-Oct-11')
 
 ra12.AddSeason([810, 811], 'NE', '2014-Dec-12', '2015-Mar-01')
@@ -1100,8 +1370,8 @@ ra12.AddSpecialTimes([810, 811], 'FW3', '2015-Oct-28', '2015-Nov-05')
 #+BEGIN_SRC ipython :session :results none
 %matplotlib inline
 
-import moor.moor as moor
-import chipy.chipy as chipy
+import moor
+import chipy
 importlib.reload(moor)
 importlib.reload(chipy)
 
@@ -1110,8 +1380,8 @@ if 'rama' not in os.getcwd():
     os.chdir('/home/deepak/rama/scripts/')
 
 ra15 = moor.moor(90, 15, 'RAMA 15N', '../RAMA14/')
-ra15.AddChipod(813, 15, 'mm', 'Turb-avg.mat')
-ra15.AddChipod(814, 30, 'mm1', 'Turb-avg.mat')
+ra15.AddChipod(813, 15, 'mm', 'Turb.mat')
+ra15.AddChipod(814, 30, 'mm1', 'Turb.mat')
 ra15.ReadMet('../data/met15n90e_10m.cdf', WindType='pmel')
 ra15.ReadMet(WindType='sat')
 ra15.ReadCTD('../RamaPrelimProcessed/RAMA14-15N.mat', 'ramaprelim')
@@ -1127,7 +1397,7 @@ ra15.AddSpecialTimes([813, 814], 'Storm1', '2015-Jul-03', '2015-Jun-25')
 
 #+NAME: read-ra12-2015
 #+BEGIN_SRC ipython :session :results none
-import chipy.chipy as chipy
+import chipy
 import importlib
 chipy = importlib.reload(chipy)
 
@@ -1139,7 +1409,7 @@ c810.LoadT1T2()
 
 #+NAME: read-527
 #+BEGIN_SRC ipython :session :results none
-import chipy.chipy as chipy
+import chipy
 import importlib
 chipy = importlib.reload(chipy)
 
